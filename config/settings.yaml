@@ -1,0 +1,85 @@
+app:
+  name: agent_memory_v2
+  timezone: Europe/London
+user:
+  current_profile: catchall
+llm:
+  provider: ollama
+  host: http://localhost:11434
+  model: llama3:8b
+  timeout_seconds: 60
+  temperature: 0.2
+  max_tokens: 400
+  preflight:
+    enabled: true
+    generate: true
+    timeout_seconds: 60
+    max_tokens: 4
+embeddings:
+  provider: ollama
+  host: http://localhost:11434
+  model: nomic-embed-text
+  timeout_seconds: 60
+  dimensions: 768
+memory:
+  embedding_dim: 768
+  top_k: 5
+  similarity_threshold: 0.25
+  index_path: data/memory/memory.index
+  metadata_path: data/memory/memory_metadata.json
+  interaction_log_path: data/logs/interactions.jsonl
+sidecar:
+  enabled: true
+  top_k: 3
+  similarity_threshold: 0.2
+  index_path: data/sidecar/facts.index
+  metadata_path: data/sidecar/facts_metadata.json
+  store_classes:
+    - preference
+    - fact
+profile:
+  enabled: true
+  path: data/profile/user_profile.json
+  inject: true
+aging:
+  enabled: true
+  decay:
+    ephemeral_start_days: 1
+    ephemeral_full_days: 14
+    ephemeral_max_penalty: 0.08
+    task_start_days: 30
+    task_full_days: 90
+    task_max_penalty: 0.03
+    durable_start_days: 180
+    durable_full_days: 365
+    durable_max_penalty: 0.01
+  prune:
+    ephemeral_turn_ttl_days: 14
+    task_ttl_days: 90
+    resolved_task_ttl_days: 7
+    dry_run_limit: 100
+    archive_path: data/archive/pruned_memories.jsonl
+  sidecar:
+    enabled: true
+    archive_path: data/archive/pruned_sidecar.jsonl
+maintenance:
+  enabled: true
+  state_path: data/maintenance/state.json
+  lock_path: data/maintenance/lock
+  min_interval_minutes: 30
+  max_new_records: 10
+  startup_check: true
+  startup_run_if_due: true
+  run_profile_rebuild: true
+  run_prune: true
+  run_sidecar_prune: true
+prompting:
+  memory_heading: Relevant memory
+  input_heading: Current user input
+  inject_now: true
+  factual_max_items: 3
+  contextual_max_items: 2
+  dedupe_profile_facts: true
+  drop_nondurable_contextual: true
+  temporal_context:
+    enabled: true

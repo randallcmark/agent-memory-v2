@@ -1,0 +1,93 @@
+Metadata-Version: 2.4
+Name: agent-memory-v2
+Version: 0.1.0
+Summary: Clean rebuild of a persistent memory layer for local Ollama-backed agents.
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: faiss-cpu
+Requires-Dist: numpy
+Requires-Dist: PyYAML
+Requires-Dist: requests
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Provides-Extra: embeddings
+Requires-Dist: sentence-transformers>=3.0; extra == "embeddings"
+
+# Agent Memory V2
+
+`agent_memory_v2` is a clean rebuild of the original agent memory project.
+
+The objective is unchanged:
+
+1. process interactions,
+2. persist useful memory,
+3. retrieve relevant memory,
+4. inject retrieved memory into subsequent prompts,
+5. run against a local Ollama-hosted `llama3:8b` model.
+
+## Scope of Milestone 1
+
+Milestone 1 establishes a narrow, testable baseline:
+
+- single local LLM provider: Ollama
+- single embedding path: sentence-transformers
+- single vector store: FAISS
+- deterministic memory record model
+- prompt injection based on recalled memory
+- simple CLI loop for manual verification
+
+This version deliberately excludes advanced features for now:
+
+- sidecar anchor stores
+- multi-provider abstraction
+- LLM summarization-based preprocessing
+- warm-start optimization
+- rich memory classification beyond base metadata
+
+## Install
+
+Base install for development and tests:
+
+```bash
+pip install -e '.[dev]'
+```
+
+Embedding model support:
+
+```bash
+pip install -e '.[dev,embeddings]'
+```
+
+The embedding dependency is separated so the test harness and project skeleton
+can be bootstrapped before model-layer compatibility is finalized.
+
+## Layout
+
+```text
+agent_memory_v2/
+├── config/
+│   └── settings.yaml
+├── src/
+│   └── agent_memory_v2/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── embeddings.py
+│       ├── models.py
+│       ├── ollama.py
+│       ├── pipeline.py
+│       └── store.py
+├── tests/
+│   ├── integration/
+│   └── unit/
+└── pyproject.toml
+```
+
+## Intended Next Steps
+
+1. create a clean Python 3.13 virtualenv,
+2. install dependencies,
+3. run the test suite,
+4. wire the CLI to a local Ollama instance,
+5. harden the ingestion and recall path before adding richer preprocessing.

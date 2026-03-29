@@ -1,0 +1,2 @@
+[console_scripts]
+agent-memory-v2 = agent_memory_v2.pipeline:main

@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-memory-v2"
+version = "0.1.0"
+description = "Clean rebuild of a persistent memory layer for local Ollama-backed agents."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "faiss-cpu",
+  "numpy",
+  "PyYAML",
+  "requests",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+]
+embeddings = [
+  "sentence-transformers>=3.0",
+]
+
+[project.scripts]
+agent-memory-v2 = "agent_memory_v2.pipeline:main"
+agent-memory-v2-ollama-smoke = "agent_memory_v2.ollama_smoke:main"
+agent-memory-v2-e2e-smoke = "agent_memory_v2.e2e_smoke:main"
+agent-memory-v2-admin = "agent_memory_v2.admin:main"
+agent-memory-v2-doctor = "agent_memory_v2.doctor:main"
+agent-memory-v2-embedding-smoke = "agent_memory_v2.embedding_smoke:main"
+agent-memory-v2-config = "agent_memory_v2.config_tool:main"
+agent-memory-v2-classify = "agent_memory_v2.classify_cli:main"
+agent-memory-v2-recall = "agent_memory_v2.recall_cli:main"
+agent-memory-v2-prompt = "agent_memory_v2.prompt_cli:main"
+agent-memory-v2-generate = "agent_memory_v2.generate_cli:main"
+agent-memory-v2-ingest = "agent_memory_v2.ingest_cli:main"
+agent-memory-v2-seed = "agent_memory_v2.seed_cli:main"
+agent-memory-v2-sanitise = "agent_memory_v2.sanitise_cli:main"
+agent-memory-v2-state = "agent_memory_v2.state_cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "--tb=short -ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
