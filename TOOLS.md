@@ -217,6 +217,7 @@ make scenario-list
 make scenario-run ARGS="--scenario negative_sentiment_preference"
 make scenario-run ARGS="--scenario semantic_location_candidate"
 make scenario-run ARGS="--scenario semantic_world_context_not_profile"
+make scenario-run ARGS="--scenario semantic_location_correction_latest_wins"
 make scenario-show ARGS="--run-id 20260329_211535_negative_sentiment_preference"
 make scenario-compare ARGS="--run-a <run-a> --run-b <run-b>"
 ```
@@ -302,9 +303,10 @@ Recommended semantic-extraction review routine:
 7. `make profile`
 8. `make scenario-run ARGS="--scenario semantic_location_candidate"`
 9. `make scenario-show ARGS="--run-id <semantic_location_run_id>"`
-10. `make rebuild`
-11. `make list-sidecar ARGS="--limit 10"`
-12. `make profile`
+10. `make scenario-run ARGS="--scenario semantic_location_correction_latest_wins"`
+11. `make rebuild`
+12. `make list-sidecar ARGS="--limit 10"`
+13. `make profile`
 
 For Phase 2, the expected qualitative result for durable user facts is an
 accepted `structured_extraction`, a promoted `memory_class`, and a corresponding

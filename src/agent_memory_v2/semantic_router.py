@@ -50,6 +50,7 @@ PROTOTYPES: tuple[SemanticPrototype, ...] = (
             "I live in Edinburgh.",
             "I'm based in Edinburgh in the UK.",
             "I am based in Edinburgh.",
+            "Actually, I am based in Glasgow now.",
             "My home is in London.",
             "I currently live in Bristol.",
         ),

@@ -40,6 +40,17 @@ class StubExtractionOllama:
         return self.response
 
 
+class QueueExtractionOllama:
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = list(responses)
+
+    def generate(self, prompt: str) -> str:
+        del prompt
+        if not self.responses:
+            raise AssertionError("No queued extraction response")
+        return self.responses.pop(0)
+
+
 def make_config(tmp_path: Path) -> AppConfig:
     return AppConfig(
         root_dir=tmp_path,
@@ -801,6 +812,78 @@ def test_structured_extractor_rejection_keeps_semantic_candidate_nondurable(tmp_
     assert stored.metadata["structured_extraction"]["rejection_reason"] == "below_confidence_threshold"
     assert pipeline.sidecar_store is not None
     assert pipeline.sidecar_store.records == []
+
+
+def test_structured_extractor_location_correction_updates_profile_latest_value(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["embeddings"] = {"provider": "hash", "model": "hash", "dimensions": 128}
+    config.raw["memory"]["embedding_dim"] = 128
+    config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}
+    config.raw["structured_extractor"] = {
+        "enabled": True,
+        "admission_threshold": 0.75,
+        "max_value_chars": 160,
+        "allowed_profile_keys": ["identity.location"],
+    }
+    config.raw["sidecar"] = {
+        "enabled": True,
+        "top_k": 3,
+        "similarity_threshold": 0.2,
+        "index_path": "data/sidecar/test.index",
+        "metadata_path": "data/sidecar/test.json",
+        "store_classes": ["preference", "fact", "task"],
+    }
+    config.raw["profile"] = {"enabled": True, "path": "data/profile/test.json", "inject": True}
+    pipeline = MemoryPipeline(
+        config,
+        encoder=HashEmbeddingEncoder(dimensions=128),
+        ollama=QueueExtractionOllama(
+            [
+                '{"memory_class":"fact","durable":true,"profile_key":"identity.location",'
+                '"extracted_value":"Edinburgh in the UK","confidence":0.86,'
+                '"supersedes_profile_key":"identity.location"}',
+                '{"memory_class":"fact","durable":true,"profile_key":"identity.location",'
+                '"extracted_value":"Glasgow now","confidence":0.88,'
+                '"supersedes_profile_key":"identity.location"}',
+            ]
+        ),
+    )
+
+    pipeline.ingest_turn(
+        Message(
+            role="user",
+            text="I'm based in Edinburgh in the UK.",
+            turn_id="location-1",
+            timestamp="2026-03-29T08:00:00+00:00",
+        ),
+        Message(
+            role="agent",
+            text="Noted.",
+            turn_id="location-1",
+            timestamp="2026-03-29T08:00:01+00:00",
+        ),
+    )
+    newer = pipeline.ingest_turn(
+        Message(
+            role="user",
+            text="Actually, I am based in Glasgow now.",
+            turn_id="location-2",
+            timestamp="2026-03-30T08:00:00+00:00",
+        ),
+        Message(
+            role="agent",
+            text="Updated.",
+            turn_id="location-2",
+            timestamp="2026-03-30T08:00:01+00:00",
+        ),
+    )
+
+    assert newer.metadata["classification_source"] == "structured_extractor"
+    assert pipeline.sidecar_store is not None
+    assert len(pipeline.sidecar_store.records) == 2
+    assert pipeline.profile_store is not None
+    profile = pipeline.profile_store.load()
+    assert profile["facts"]["identity.location"]["value"] == "Glasgow now"
 
 
 def test_merged_recall_groups_factual_and_contextual_items(tmp_path: Path):

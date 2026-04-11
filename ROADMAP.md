@@ -80,6 +80,7 @@ Hybrid extraction progress:
 - [x] Rebuild support for hybrid extraction
 - [x] Scenario coverage for naturally phrased durable facts such as `I'm based in Edinburgh`
 - [x] Deterministic eval coverage for semantic candidate metadata
+- [x] Scenario and unit coverage for naturally phrased location corrections/latest-wins profile behavior
 
 Current aging progress:
 - [x] Age-aware recall scoring

@@ -52,6 +52,16 @@
       }
     },
     {
+      "name": "location_correction_candidate",
+      "text": "Actually, I am based in Glasgow now.",
+      "expected": {
+        "candidate_key": "identity.location",
+        "candidate_class": "fact",
+        "above_threshold": true,
+        "durable_candidate": true
+      }
+    },
+    {
       "name": "world_fact_context_candidate",
       "text": "The Meadows has cherry blossom trees.",
       "expected": {

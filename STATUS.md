@@ -58,6 +58,7 @@ V2 has reached a working operational baseline:
 - accepted structured extractions now promote records into the existing durable sidecar/profile path, while rejected attempts remain traceable in metadata
 - rebuild now replays the hybrid semantic/extraction path from interaction logs so promoted memories can be restored after reset/rebuild
 - deterministic evals now include a semantic routing stage for candidate-key and durability-candidate checks
+- hybrid extraction coverage now includes naturally phrased location corrections where the latest profile value wins
 
 Milestones 1 through 5 are now complete. The first prompt-strategy quality
 upgrade is also complete. The default embedding provider is now

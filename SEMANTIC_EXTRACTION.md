@@ -187,7 +187,7 @@ facts.
 - [x] add rebuild support for hybrid extraction
 - [x] add eval cases for missed durable facts like `I'm based in Edinburgh`
 - [x] add scenario cases for naturally phrased durable facts
-- [ ] add scenario cases for corrections and updates
+- [x] add scenario cases for corrections and updates
 
 ## Evaluation Plan
 

@@ -118,6 +118,27 @@
         "Check that `durable_candidate` is false.",
         "Check that no user profile fact is created from this world-context statement."
       ]
+    },
+    {
+      "name": "semantic_location_correction_latest_wins",
+      "category": "semantic-extraction",
+      "description": "A naturally phrased location correction should extract both facts while the profile uses the latest value.",
+      "setup_turns": [
+        {
+          "user": "I'm based in Edinburgh in the UK.",
+          "agent": "Noted."
+        },
+        {
+          "user": "Actually, I am based in Glasgow now.",
+          "agent": "Updated."
+        }
+      ],
+      "query": "Where am I based now?",
+      "review_notes": [
+        "Check both setup records have accepted `structured_extraction` metadata.",
+        "Check the user profile has `identity.location = Glasgow now` or a semantically equivalent Glasgow value.",
+        "Check the final prompt does not foreground the older Edinburgh value over the newer Glasgow value."
+      ]
     }
   ]
 }
