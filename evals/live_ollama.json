@@ -1,0 +1,106 @@
+{
+  "memory": [
+    {
+      "name": "preference_recall_oat_milk",
+      "turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "What do I prefer?",
+      "expected_contains": [
+        "oat milk"
+      ],
+      "expected_not_contains": [
+        "almond milk"
+      ]
+    },
+    {
+      "name": "identity_recall_name",
+      "turns": [
+        {
+          "user": "My name is Mark.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "What is my name?",
+      "expected_contains": [
+        "Mark"
+      ]
+    },
+    {
+      "name": "superseded_location_latest_wins",
+      "turns": [
+        {
+          "user": "I live in Bristol.",
+          "agent": "Noted."
+        },
+        {
+          "user": "I live in London now.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "Where do I live?",
+      "expected_contains": [
+        "London"
+      ],
+      "expected_not_contains": [
+        "Bristol"
+      ]
+    },
+    {
+      "name": "task_recall_passport",
+      "turns": [
+        {
+          "user": "Remind me to renew my passport.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "What did I ask you to remind me about?",
+      "expected_contains": [
+        "passport"
+      ]
+    }
+  ],
+  "sentiment": [
+    {
+      "name": "negative_sentiment_acknowledged",
+      "turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "I am really frustrated with this bug. What do I prefer?",
+      "expected_contains": [
+        "oat milk"
+      ],
+      "expected_any_contains": [
+        "frustr",
+        "understand",
+        "sorry"
+      ]
+    },
+    {
+      "name": "urgent_sentiment_keeps_answer_direct",
+      "turns": [
+        {
+          "user": "My name is Mark.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "I need this ASAP. What is my name?",
+      "expected_contains": [
+        "Mark"
+      ],
+      "expected_any_contains": [
+        "Mark"
+      ],
+      "expected_not_contains": [
+        "I cannot",
+        "I don't know"
+      ]
+    }
+  ]
+}

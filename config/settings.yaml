@@ -10,6 +10,7 @@ llm:
   timeout_seconds: 60
   temperature: 0.2
   max_tokens: 400
+  raw_prompt: false
   preflight:
     enabled: true
     generate: true
@@ -37,6 +38,22 @@ sidecar:
   store_classes:
     - preference
     - fact
+    - task
+semantic_router:
+  enabled: true
+  threshold: 0.72
+  debug_metadata: true
+structured_extractor:
+  enabled: true
+  admission_threshold: 0.75
+  max_value_chars: 160
+  allowed_profile_keys:
+    - identity.location
+    - identity.name
+    - identity.occupation
+    - identity.origin
+    - preference.general
+    - task.general
 profile:
   enabled: true
   path: data/profile/user_profile.json

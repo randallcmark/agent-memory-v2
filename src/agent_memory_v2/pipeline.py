@@ -21,7 +21,9 @@ from agent_memory_v2.maintenance import mark_interaction, maintenance_status, ru
 from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 from agent_memory_v2.profile import UserProfileStore
 from agent_memory_v2.sentiment import SentimentResult, detect_sentiment
+from agent_memory_v2.semantic_router import SemanticRouteResult, route_semantic_candidate
 from agent_memory_v2.store import MemoryStore
+from agent_memory_v2.structured_extractor import extract_structured_memory
 
 try:
     from zoneinfo import ZoneInfo
@@ -47,6 +49,10 @@ def _classification_metadata(result: ClassificationResult) -> dict:
         "durability_reason": result.durability_reason,
         "profile_key": result.profile_key,
     }
+
+
+def _should_run_semantic_router(result: ClassificationResult) -> bool:
+    return not result.durable and result.memory_class in {"turn", "message"}
 
 
 def _should_store_in_sidecar(config: AppConfig, metadata: dict) -> bool:
@@ -342,6 +348,7 @@ class MemoryPipeline:
                 temperature=float(llm_cfg["temperature"]),
                 max_tokens=int(llm_cfg["max_tokens"]),
                 timeout_seconds=int(llm_cfg["timeout_seconds"]),
+                raw_prompt=bool(llm_cfg.get("raw_prompt", False)),
             )
         )
 
@@ -359,7 +366,7 @@ class MemoryPipeline:
             metadata={
                 "kind": "message_memory",
                 "user_id": self.config.current_user,
-                **_classification_metadata(classification),
+                **self._memory_classification_metadata(message.text, classification),
             },
         )
 
@@ -380,9 +387,74 @@ class MemoryPipeline:
                 "user_message_id": user_message.message_id,
                 "agent_message_id": agent_message.message_id,
                 "user_id": self.config.current_user,
-                **_classification_metadata(classification),
+                **self._memory_classification_metadata(user_message.text, classification),
             },
         )
+
+    def _semantic_candidate(
+        self,
+        text: str,
+        classification: ClassificationResult,
+    ) -> SemanticRouteResult | None:
+        router_cfg = self.config.semantic_router
+        if not router_cfg.get("enabled", False):
+            return None
+        if not _should_run_semantic_router(classification):
+            return None
+        return route_semantic_candidate(
+            text,
+            self.encoder,
+            threshold=float(router_cfg.get("threshold", 0.72)),
+        )
+
+    def _structured_extraction_metadata(
+        self,
+        text: str,
+        route: SemanticRouteResult | None,
+    ) -> dict:
+        extractor_cfg = self.config.structured_extractor
+        if not extractor_cfg.get("enabled", False):
+            return {}
+        if route is None or not route.above_threshold or not route.durable_candidate:
+            return {}
+        allowed_profile_keys = set(
+            extractor_cfg.get(
+                "allowed_profile_keys",
+                [
+                    "identity.location",
+                    "identity.name",
+                    "identity.occupation",
+                    "identity.origin",
+                    "preference.general",
+                    "task.general",
+                ],
+            )
+        )
+        extraction = extract_structured_memory(
+            text,
+            route,
+            self.ollama,
+            admission_threshold=float(extractor_cfg.get("admission_threshold", 0.75)),
+            allowed_profile_keys=allowed_profile_keys,
+            max_value_chars=int(extractor_cfg.get("max_value_chars", 160)),
+        )
+        metadata = {"structured_extraction": extraction.to_metadata()}
+        if extraction.accepted:
+            metadata.update(_classification_metadata(extraction.to_classification_result()))
+            metadata["classification_source"] = "structured_extractor"
+        return metadata
+
+    def _memory_classification_metadata(self, text: str, classification: ClassificationResult) -> dict:
+        metadata = _classification_metadata(classification)
+        metadata["classification_source"] = "rule"
+        route = self._semantic_candidate(text, classification)
+        if route is not None and self.config.semantic_router.get("debug_metadata", True):
+            metadata["semantic_candidate"] = route.to_metadata()
+        extraction_metadata = self._structured_extraction_metadata(text, route)
+        if extraction_metadata.get("classification_source") == "structured_extractor":
+            metadata["rule_classification"] = _classification_metadata(classification)
+        metadata.update(extraction_metadata)
+        return metadata
 
     def _store_memory(
         self,
@@ -510,8 +582,7 @@ class MemoryPipeline:
             filtered_factual: list[dict] = []
             for item in factual:
                 profile_key = str(item.get("profile_key") or "")
-                extracted_value = _normalize_profile_value(item.get("extracted_value"))
-                if profile_key and profile_values.get(profile_key) == extracted_value:
+                if profile_key and profile_key in profile_values:
                     continue
                 filtered_factual.append(item)
             factual = filtered_factual
@@ -558,7 +629,10 @@ class MemoryPipeline:
             context_lines = [_format_recalled_item(item, self.config) for item in contextual]
             sections.append("Relevant conversation context:\n" + "\n".join(context_lines))
         if not sections:
-            sections.append(f"{self.config.prompting['memory_heading']}:\n- none")
+            fallback_heading = (
+                "Additional recalled memory" if profile_block else self.config.prompting["memory_heading"]
+            )
+            sections.append(f"{fallback_heading}:\n- none")
         memory_block = "\n\n".join(sections)
         return (
             "You are a helpful assistant with access to relevant prior memory and temporal context.\n\n"
@@ -567,7 +641,7 @@ class MemoryPipeline:
             f"{profile_block}"
             f"{memory_block}\n\n"
             f"{input_heading}:\n{message.text}\n\n"
-            "Respond to the user directly. Use recalled memory only if it is relevant."
+            "Respond to the user directly. Use the user profile and recalled memory if they are relevant."
         )
 
     def merged_recall(self, message: Message) -> dict:
@@ -610,6 +684,7 @@ def run_ollama_preflight(config: AppConfig) -> dict:
             temperature=0.0,
             max_tokens=int(preflight_cfg.get("max_tokens", 4)),
             timeout_seconds=int(preflight_cfg.get("timeout_seconds", llm_cfg["timeout_seconds"])),
+            raw_prompt=bool(llm_cfg.get("raw_prompt", False)),
         )
     )
     return client.healthcheck(run_generate=bool(preflight_cfg.get("generate", True)))

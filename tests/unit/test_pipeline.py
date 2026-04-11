@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from agent_memory_v2.classifier import classify_text, detect_task_resolution
 from agent_memory_v2.config import AppConfig
+from agent_memory_v2.embeddings import HashEmbeddingEncoder
 from agent_memory_v2.models import Message
 from agent_memory_v2.pipeline import (
     MemoryPipeline,
@@ -29,6 +30,14 @@ class StubEncoder:
 class StubOllama:
     def generate(self, prompt: str) -> str:
         return "stub-response"
+
+
+class StubExtractionOllama:
+    def __init__(self, response: str) -> None:
+        self.response = response
+
+    def generate(self, prompt: str) -> str:
+        return self.response
 
 
 def make_config(tmp_path: Path) -> AppConfig:
@@ -308,6 +317,52 @@ def test_prompt_context_dedupes_profile_backed_factual_items(tmp_path: Path):
     assert context["factual"] == []
 
 
+def test_prompt_context_dedupes_superseded_profile_fact_even_when_value_differs(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["profile"] = {"enabled": True, "path": "data/profile/test.json", "inject": True}
+    pipeline = MemoryPipeline(
+        config,
+        encoder=StubEncoder(),
+        ollama=StubOllama(),
+    )
+    pipeline.profile_store.save(
+        {
+            "updated_at": "2026-03-29T00:00:00+00:00",
+            "counts": {"preferences": 0, "facts": 1, "tasks": 0},
+            "preferences": {},
+            "facts": {
+                "identity.location": {
+                    "value": "London now",
+                    "timestamp": "2026-03-29T00:00:00+00:00",
+                    "memory_class": "fact",
+                    "source_message_id": "m2",
+                }
+            },
+            "tasks": {},
+        }
+    )
+
+    context = pipeline.prompt_context(
+        [
+            {
+                "role": "fact",
+                "text": "Bristol",
+                "score": 0.9,
+                "timestamp": "2026-03-29T07:00:00+00:00",
+                "message_id": "m1",
+                "store_kind": "sidecar_memory",
+                "memory_class": "fact",
+                "profile_key": "identity.location",
+                "extracted_value": "Bristol",
+                "durable": True,
+            }
+        ]
+    )
+
+    assert context["profile"]["facts"]["identity.location"]["value"] == "London now"
+    assert context["factual"] == []
+
+
 def test_prompt_context_drops_nondurable_contextual_when_durable_exists(tmp_path: Path):
     pipeline = MemoryPipeline(
         make_config(tmp_path),
@@ -393,6 +448,8 @@ def test_build_prompt_omits_profile_duplicated_factual_section(tmp_path: Path):
     assert "User profile:" in prompt
     assert "- preference.general: oat milk" in prompt
     assert "Relevant durable facts:" not in prompt
+    assert "Additional recalled memory:" in prompt
+    assert "Relevant memory:" not in prompt
 
 
 def test_prompt_context_drops_ephemeral_context_when_profile_is_sufficient(tmp_path: Path):
@@ -438,6 +495,36 @@ def test_prompt_context_drops_ephemeral_context_when_profile_is_sufficient(tmp_p
 
     assert context["contextual"] == []
     assert len(context["dropped_contextual"]) == 1
+
+
+def test_build_prompt_uses_additional_recalled_memory_heading_when_profile_exists(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["profile"] = {"enabled": True, "path": "data/profile/test.json", "inject": True}
+    pipeline = MemoryPipeline(
+        config,
+        encoder=StubEncoder(),
+        ollama=StubOllama(),
+    )
+    pipeline.profile_store.save(
+        {
+            "updated_at": "2026-03-29T00:00:00+00:00",
+            "counts": {"preferences": 1, "facts": 0, "tasks": 0},
+            "preferences": {
+                "preference.general": {
+                    "value": "oat milk",
+                    "timestamp": "2026-03-29T00:00:00+00:00",
+                    "memory_class": "preference",
+                    "source_message_id": "m1",
+                }
+            },
+            "facts": {},
+            "tasks": {},
+        }
+    )
+
+    prompt = pipeline.build_prompt(Message(role="user", text="What do I prefer?"), [])
+    assert "Additional recalled memory:" in prompt
+    assert "Relevant memory:" not in prompt
 
 
 def test_build_temporal_context_includes_absolute_and_relative_dates(tmp_path: Path):
@@ -586,6 +673,134 @@ def test_recall_prefers_sidecar_record_for_durable_fact(tmp_path: Path):
     assert recalled[0]["memory_class"] == "preference"
     assert recalled[0]["store_kind"] == "sidecar_memory"
     assert recalled[0]["source_message_id"] == recalled[0]["message_id"]
+
+
+def test_semantic_candidate_metadata_is_stored_without_sidecar_promotion(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["embeddings"] = {"provider": "hash", "model": "hash", "dimensions": 128}
+    config.raw["memory"]["embedding_dim"] = 128
+    config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}
+    config.raw["sidecar"] = {
+        "enabled": True,
+        "top_k": 2,
+        "similarity_threshold": 0.2,
+        "index_path": "data/sidecar/test.index",
+        "metadata_path": "data/sidecar/test.json",
+        "store_classes": ["preference", "fact", "task"],
+    }
+    pipeline = MemoryPipeline(
+        config,
+        encoder=HashEmbeddingEncoder(dimensions=128),
+        ollama=StubOllama(),
+    )
+
+    stored = pipeline.ingest_turn(
+        Message(role="user", text="I'm based in Edinburgh in the UK.", turn_id="semantic-turn"),
+        Message(role="agent", text="Noted.", turn_id="semantic-turn"),
+    )
+
+    semantic_candidate = stored.metadata["semantic_candidate"]
+    assert stored.metadata["memory_class"] == "turn"
+    assert stored.metadata["durable"] is False
+    assert semantic_candidate["candidate_key"] == "identity.location"
+    assert semantic_candidate["candidate_class"] == "fact"
+    assert semantic_candidate["durable_candidate"] is True
+    assert semantic_candidate["above_threshold"] is True
+    assert pipeline.sidecar_store is not None
+    assert pipeline.sidecar_store.records == []
+
+
+def test_structured_extractor_promotes_semantic_candidate_to_sidecar_and_profile(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["embeddings"] = {"provider": "hash", "model": "hash", "dimensions": 128}
+    config.raw["memory"]["embedding_dim"] = 128
+    config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}
+    config.raw["structured_extractor"] = {
+        "enabled": True,
+        "admission_threshold": 0.75,
+        "max_value_chars": 160,
+        "allowed_profile_keys": ["identity.location"],
+    }
+    config.raw["sidecar"] = {
+        "enabled": True,
+        "top_k": 2,
+        "similarity_threshold": 0.2,
+        "index_path": "data/sidecar/test.index",
+        "metadata_path": "data/sidecar/test.json",
+        "store_classes": ["preference", "fact", "task"],
+    }
+    config.raw["profile"] = {"enabled": True, "path": "data/profile/test.json", "inject": True}
+    pipeline = MemoryPipeline(
+        config,
+        encoder=HashEmbeddingEncoder(dimensions=128),
+        ollama=StubExtractionOllama(
+            '{"memory_class":"fact","durable":true,"profile_key":"identity.location",'
+            '"extracted_value":"Edinburgh","confidence":0.86,'
+            '"supersedes_profile_key":"identity.location"}'
+        ),
+    )
+
+    stored = pipeline.ingest_turn(
+        Message(role="user", text="I'm based in Edinburgh in the UK.", turn_id="semantic-turn"),
+        Message(role="agent", text="Noted.", turn_id="semantic-turn"),
+    )
+
+    assert stored.metadata["classification_source"] == "structured_extractor"
+    assert stored.metadata["memory_class"] == "fact"
+    assert stored.metadata["durable"] is True
+    assert stored.metadata["profile_key"] == "identity.location"
+    assert stored.metadata["extracted_value"] == "Edinburgh"
+    assert stored.metadata["rule_classification"]["memory_class"] == "turn"
+    assert stored.metadata["structured_extraction"]["accepted"] is True
+    assert pipeline.sidecar_store is not None
+    assert len(pipeline.sidecar_store.records) == 1
+    assert pipeline.sidecar_store.records[0].text == "Edinburgh"
+    assert pipeline.profile_store is not None
+    profile = pipeline.profile_store.load()
+    assert profile["facts"]["identity.location"]["value"] == "Edinburgh"
+
+
+def test_structured_extractor_rejection_keeps_semantic_candidate_nondurable(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["embeddings"] = {"provider": "hash", "model": "hash", "dimensions": 128}
+    config.raw["memory"]["embedding_dim"] = 128
+    config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}
+    config.raw["structured_extractor"] = {
+        "enabled": True,
+        "admission_threshold": 0.75,
+        "max_value_chars": 160,
+        "allowed_profile_keys": ["identity.location"],
+    }
+    config.raw["sidecar"] = {
+        "enabled": True,
+        "top_k": 2,
+        "similarity_threshold": 0.2,
+        "index_path": "data/sidecar/test.index",
+        "metadata_path": "data/sidecar/test.json",
+        "store_classes": ["preference", "fact", "task"],
+    }
+    pipeline = MemoryPipeline(
+        config,
+        encoder=HashEmbeddingEncoder(dimensions=128),
+        ollama=StubExtractionOllama(
+            '{"memory_class":"fact","durable":true,"profile_key":"identity.location",'
+            '"extracted_value":"Edinburgh","confidence":0.5,'
+            '"supersedes_profile_key":"identity.location"}'
+        ),
+    )
+
+    stored = pipeline.ingest_turn(
+        Message(role="user", text="I'm based in Edinburgh in the UK.", turn_id="semantic-turn"),
+        Message(role="agent", text="Noted.", turn_id="semantic-turn"),
+    )
+
+    assert stored.metadata["classification_source"] == "rule"
+    assert stored.metadata["memory_class"] == "turn"
+    assert stored.metadata["durable"] is False
+    assert stored.metadata["structured_extraction"]["accepted"] is False
+    assert stored.metadata["structured_extraction"]["rejection_reason"] == "below_confidence_threshold"
+    assert pipeline.sidecar_store is not None
+    assert pipeline.sidecar_store.records == []
 
 
 def test_merged_recall_groups_factual_and_contextual_items(tmp_path: Path):

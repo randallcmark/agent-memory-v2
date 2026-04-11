@@ -1,2 +1,19 @@
 [console_scripts]
 agent-memory-v2 = agent_memory_v2.pipeline:main
+agent-memory-v2-admin = agent_memory_v2.admin:main
+agent-memory-v2-classify = agent_memory_v2.classify_cli:main
+agent-memory-v2-config = agent_memory_v2.config_tool:main
+agent-memory-v2-doctor = agent_memory_v2.doctor:main
+agent-memory-v2-e2e-smoke = agent_memory_v2.e2e_smoke:main
+agent-memory-v2-embedding-smoke = agent_memory_v2.embedding_smoke:main
+agent-memory-v2-eval = agent_memory_v2.eval_cli:main
+agent-memory-v2-generate = agent_memory_v2.generate_cli:main
+agent-memory-v2-ingest = agent_memory_v2.ingest_cli:main
+agent-memory-v2-live-eval = agent_memory_v2.live_eval_cli:main
+agent-memory-v2-ollama-smoke = agent_memory_v2.ollama_smoke:main
+agent-memory-v2-prompt = agent_memory_v2.prompt_cli:main
+agent-memory-v2-recall = agent_memory_v2.recall_cli:main
+agent-memory-v2-sanitise = agent_memory_v2.sanitise_cli:main
+agent-memory-v2-scenario = agent_memory_v2.scenario_cli:main
+agent-memory-v2-seed = agent_memory_v2.seed_cli:main
+agent-memory-v2-state = agent_memory_v2.state_cli:main

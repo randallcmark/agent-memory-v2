@@ -1,0 +1,123 @@
+{
+  "scenarios": [
+    {
+      "name": "preference_recall",
+      "category": "memory",
+      "description": "Simple durable preference recall through the user profile path.",
+      "setup_turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "What do I prefer?",
+      "review_notes": [
+        "Check whether the response answers directly.",
+        "Check whether the prompt relies on the user profile rather than cluttered recalled memory."
+      ]
+    },
+    {
+      "name": "conflicting_fact_latest_wins",
+      "category": "memory",
+      "description": "Conflicting durable facts should resolve to the latest profile-backed value.",
+      "setup_turns": [
+        {
+          "user": "I live in Bristol.",
+          "agent": "Noted."
+        },
+        {
+          "user": "I live in London now.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "Where do I live?",
+      "review_notes": [
+        "Check whether older conflicting facts are suppressed from the final prompt context.",
+        "Check whether the response uses the latest value."
+      ]
+    },
+    {
+      "name": "task_recall",
+      "category": "task",
+      "description": "Durable task memory should be retrievable and visible through the profile/task path.",
+      "setup_turns": [
+        {
+          "user": "Remind me to renew my passport.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "What did I ask you to remind me about?",
+      "review_notes": [
+        "Check whether the task is stored durably rather than only as generic turn context.",
+        "Check whether the wording in the response feels natural."
+      ]
+    },
+    {
+      "name": "negative_sentiment_preference",
+      "category": "sentiment",
+      "description": "Negative sentiment should be acknowledged while still using durable memory correctly.",
+      "setup_turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "I am really frustrated with this bug. What do I prefer?",
+      "review_notes": [
+        "Check whether frustration is acknowledged briefly.",
+        "Check whether the answer still uses the stored preference correctly.",
+        "Check whether the tone is proportional rather than overdone."
+      ]
+    },
+    {
+      "name": "urgent_sentiment_identity",
+      "category": "sentiment",
+      "description": "Urgent sentiment should bias the answer toward speed and directness.",
+      "setup_turns": [
+        {
+          "user": "My name is Mark.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "I need this ASAP. What is my name?",
+      "review_notes": [
+        "Check whether the answer leads with the answer.",
+        "Check whether urgency makes the response clearer rather than noisier."
+      ]
+    },
+    {
+      "name": "semantic_location_candidate",
+      "category": "semantic-extraction",
+      "description": "Naturally phrased location should route semantically, extract a durable fact, and populate profile/sidecar when confidence is high enough.",
+      "setup_turns": [
+        {
+          "user": "I'm based in Edinburgh in the UK.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "Where am I based?",
+      "review_notes": [
+        "Check the ingested setup record metadata for `semantic_candidate.candidate_key = identity.location`.",
+        "Check that `structured_extraction.accepted` is true.",
+        "Check that the sidecar/profile path contains `identity.location` with the extracted value."
+      ]
+    },
+    {
+      "name": "semantic_world_context_not_profile",
+      "category": "semantic-extraction",
+      "description": "Local-world context should be detectable as useful context without becoming a user profile fact.",
+      "setup_turns": [
+        {
+          "user": "The Meadows has cherry blossom trees.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "What did I say about cherry blossom?",
+      "review_notes": [
+        "Check the ingested setup record metadata for `semantic_candidate.candidate_key = contextual.world_fact`.",
+        "Check that `durable_candidate` is false.",
+        "Check that no user profile fact is created from this world-context statement."
+      ]
+    }
+  ]
+}

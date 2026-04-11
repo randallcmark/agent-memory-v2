@@ -16,8 +16,11 @@ from agent_memory_v2.classifier import classify_text
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.embeddings import build_encoder
 from agent_memory_v2.models import MemoryRecord
+from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 from agent_memory_v2.profile import UserProfileStore
+from agent_memory_v2.semantic_router import route_semantic_candidate
 from agent_memory_v2.store import MemoryStore
+from agent_memory_v2.structured_extractor import TextGenerator, extract_structured_memory
 
 
 def _build_store(config: AppConfig) -> MemoryStore:
@@ -61,7 +64,31 @@ def _classification_source_text(item: dict) -> str:
     return text
 
 
-def _reclassified_metadata(item: dict) -> dict:
+def _should_run_semantic_router(metadata: dict) -> bool:
+    return not metadata.get("durable", False) and metadata.get("memory_class") in {"turn", "message"}
+
+
+def _build_extractor_generator(config: AppConfig) -> OllamaClient:
+    llm_cfg = config.llm
+    return OllamaClient(
+        OllamaProfile(
+            host=llm_cfg["host"],
+            model=llm_cfg["model"],
+            temperature=0.0,
+            max_tokens=int(llm_cfg.get("max_tokens", 400)),
+            timeout_seconds=int(llm_cfg.get("timeout_seconds", 60)),
+            raw_prompt=bool(llm_cfg.get("raw_prompt", False)),
+        )
+    )
+
+
+def _reclassified_metadata(
+    item: dict,
+    config: AppConfig | None = None,
+    *,
+    encoder=None,
+    extractor_generator: TextGenerator | None = None,
+) -> dict:
     metadata = dict(item.get("metadata") or {})
     source_text = _classification_source_text(item)
     default_class = "turn" if item.get("role") == "turn" else item.get("role", "message")
@@ -72,6 +99,58 @@ def _reclassified_metadata(item: dict) -> dict:
     metadata["durable"] = classification.durable
     metadata["durability_reason"] = classification.durability_reason
     metadata["profile_key"] = classification.profile_key
+    metadata["classification_source"] = "rule"
+
+    if config is None or encoder is None:
+        return metadata
+    router_cfg = config.semantic_router
+    if not router_cfg.get("enabled", False) or not _should_run_semantic_router(metadata):
+        return metadata
+    route = route_semantic_candidate(
+        source_text,
+        encoder,
+        threshold=float(router_cfg.get("threshold", 0.72)),
+    )
+    if route is None:
+        return metadata
+    if router_cfg.get("debug_metadata", True):
+        metadata["semantic_candidate"] = route.to_metadata()
+
+    extractor_cfg = config.structured_extractor
+    if not extractor_cfg.get("enabled", False):
+        return metadata
+    if not route.above_threshold or not route.durable_candidate:
+        return metadata
+
+    generator = extractor_generator or _build_extractor_generator(config)
+    extraction = extract_structured_memory(
+        source_text,
+        route,
+        generator,
+        admission_threshold=float(extractor_cfg.get("admission_threshold", 0.75)),
+        allowed_profile_keys=set(extractor_cfg.get("allowed_profile_keys", [])),
+        max_value_chars=int(extractor_cfg.get("max_value_chars", 160)),
+    )
+    metadata["structured_extraction"] = extraction.to_metadata()
+    if not extraction.accepted:
+        return metadata
+
+    metadata["rule_classification"] = {
+        "memory_class": classification.memory_class,
+        "extracted_value": classification.extracted_value,
+        "classification_confidence": classification.confidence,
+        "durable": classification.durable,
+        "durability_reason": classification.durability_reason,
+        "profile_key": classification.profile_key,
+    }
+    promoted = extraction.to_classification_result()
+    metadata["memory_class"] = promoted.memory_class
+    metadata["extracted_value"] = promoted.extracted_value
+    metadata["classification_confidence"] = promoted.confidence
+    metadata["durable"] = promoted.durable
+    metadata["durability_reason"] = promoted.durability_reason
+    metadata["profile_key"] = promoted.profile_key
+    metadata["classification_source"] = "structured_extractor"
     return metadata
 
 
@@ -536,6 +615,9 @@ def rebuild_store(config: AppConfig) -> dict:
             config.embeddings.get("timeout_seconds", config.llm.get("timeout_seconds", 60))
         ),
     )
+    extractor_generator = None
+    if config.structured_extractor.get("enabled", False):
+        extractor_generator = _build_extractor_generator(config)
 
     rebuilt = 0
     sidecar_rebuilt = 0
@@ -558,7 +640,12 @@ def rebuild_store(config: AppConfig) -> dict:
                     conversation_id=item["conversation_id"],
                     turn_id=item["turn_id"],
                     message_id=item["message_id"],
-                    metadata=_reclassified_metadata(item),
+                    metadata=_reclassified_metadata(
+                        item,
+                        config,
+                        encoder=encoder,
+                        extractor_generator=extractor_generator,
+                    ),
                 )
                 vector = encoder.encode(summary)
                 store.add(record, vector)

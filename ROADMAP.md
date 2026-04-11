@@ -47,7 +47,39 @@
 - [x] User profile layer
 - [x] Better prompt strategy separation by memory class
 - [x] Memory aging and pruning policies
-- [ ] Evaluation harness for recall-quality comparisons
+- [x] Evaluation harness for recall-quality comparisons
+- [ ] Hybrid durable-memory extraction: rules first, semantic routing second, structured fallback extraction third
+
+Evaluation harness progress:
+- [x] Checked-in generic eval dataset
+- [x] Stage runners for classification, sentiment, profile, recall, and prompt behavior
+- [x] Aggregate `eval-all` runner
+- [x] Machine-readable JSON output
+- [x] Baseline history and score trend tracking over time
+
+Live Ollama evaluation progress:
+- [x] Checked-in live Ollama eval dataset
+- [x] Live memory-use eval runner
+- [x] Live sentiment-behavior eval runner
+- [x] Aggregate `live-eval-all` runner
+- [x] Failure artifact capture for recalled items, final prompt, and model response
+
+Qualitative workflow progress:
+- [x] Checked-in scenario dataset for subjective review
+- [x] Scenario runner with saved artifact bundles
+- [x] Scenario show/compare tooling
+- [ ] Reviewer notes or annotation workflow on top of saved scenario artifacts
+
+Hybrid extraction progress:
+- [x] Prototype durable-memory semantic classes
+- [x] Semantic candidate router for rule misses
+- [x] Metadata-only semantic debug output for `make classify --semantic`
+- [x] Unit and pipeline coverage proving semantic candidates do not write to sidecar in Phase 1
+- [x] Constrained Ollama fallback extractor for durable-memory candidates
+- [x] Sidecar admission gating by extracted confidence
+- [x] Rebuild support for hybrid extraction
+- [x] Scenario coverage for naturally phrased durable facts such as `I'm based in Edinburgh`
+- [x] Deterministic eval coverage for semantic candidate metadata
 
 Current aging progress:
 - [x] Age-aware recall scoring
@@ -126,3 +158,4 @@ Current aging progress:
 - [ ] Rich extractor pipeline
 - [ ] Prompt profile system
 - [ ] Advanced operational and migration tooling
+- [x] Baseline history and score trend tracking over time

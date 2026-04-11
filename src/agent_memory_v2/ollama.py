@@ -13,6 +13,7 @@ class OllamaProfile:
     temperature: float
     max_tokens: int
     timeout_seconds: int
+    raw_prompt: bool = False
 
 
 class OllamaClient:
@@ -112,7 +113,7 @@ class OllamaClient:
             "model": self.profile.model,
             "prompt": prompt,
             "stream": False,
-            "raw": True,
+            "raw": self.profile.raw_prompt,
             "options": {
                 "temperature": self.profile.temperature,
                 "num_predict": self.profile.max_tokens,

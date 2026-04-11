@@ -1,0 +1,221 @@
+{
+  "classification": [
+    {
+      "name": "preference_oat_milk",
+      "text": "I prefer oat milk.",
+      "expected": {
+        "memory_class": "preference",
+        "extracted_value": "oat milk",
+        "durable": true,
+        "profile_key": "preference.general"
+      }
+    },
+    {
+      "name": "fact_name",
+      "text": "My name is Mark.",
+      "expected": {
+        "memory_class": "fact",
+        "extracted_value": "Mark",
+        "durable": true,
+        "profile_key": "identity.name"
+      }
+    },
+    {
+      "name": "task_passport",
+      "text": "Remind me to renew my passport.",
+      "expected": {
+        "memory_class": "task",
+        "extracted_value": "renew my passport",
+        "durable": true,
+        "profile_key": "task.general"
+      }
+    },
+    {
+      "name": "ephemeral_greeting",
+      "text": "Hello",
+      "expected": {
+        "memory_class": "turn",
+        "durable": false,
+        "durability_reason": "ephemeral_pattern"
+      }
+    }
+  ],
+  "semantic": [
+    {
+      "name": "location_candidate",
+      "text": "I'm based in Edinburgh in the UK.",
+      "expected": {
+        "candidate_key": "identity.location",
+        "candidate_class": "fact",
+        "above_threshold": true,
+        "durable_candidate": true
+      }
+    },
+    {
+      "name": "world_fact_context_candidate",
+      "text": "The Meadows has cherry blossom trees.",
+      "expected": {
+        "candidate_key": "contextual.world_fact",
+        "candidate_class": "context",
+        "above_threshold": true,
+        "durable_candidate": false
+      }
+    },
+    {
+      "name": "ephemeral_question_candidate",
+      "text": "What day is it today?",
+      "expected": {
+        "candidate_key": "ephemeral.question",
+        "candidate_class": "ephemeral",
+        "above_threshold": true,
+        "durable_candidate": false
+      }
+    }
+  ],
+  "sentiment": [
+    {
+      "name": "negative_bug_report",
+      "text": "I am really frustrated with this bug.",
+      "expected": {
+        "label": "negative"
+      }
+    },
+    {
+      "name": "urgent_request",
+      "text": "I need this fixed ASAP.",
+      "expected": {
+        "label": "urgent"
+      }
+    },
+    {
+      "name": "positive_feedback",
+      "text": "Perfect, that was excellent.",
+      "expected": {
+        "label": "positive"
+      }
+    }
+  ],
+  "profile": [
+    {
+      "name": "derived_profile_contains_durable_entries",
+      "turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        },
+        {
+          "user": "My name is Mark.",
+          "agent": "Noted."
+        },
+        {
+          "user": "Remind me to renew my passport.",
+          "agent": "Noted."
+        }
+      ],
+      "expected": {
+        "preferences": {
+          "preference.general": "oat milk"
+        },
+        "facts": {
+          "identity.name": "Mark"
+        }
+      }
+    }
+  ],
+  "recall": [
+    {
+      "name": "preference_query_returns_durable_fact",
+      "turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        },
+        {
+          "user": "Hello",
+          "agent": "Hi there."
+        }
+      ],
+      "query": "What do I prefer?",
+      "expected": {
+        "factual_contains": [
+          "oat milk"
+        ],
+        "contextual_count_at_least": 0,
+        "top_merged_profile_key": "preference.general"
+      }
+    },
+    {
+      "name": "identity_query_returns_name_fact",
+      "turns": [
+        {
+          "user": "My name is Mark.",
+          "agent": "Noted."
+        }
+      ],
+      "query": "What is my name?",
+      "expected": {
+        "factual_contains": [
+          "Mark"
+        ],
+        "top_merged_profile_key": "identity.name"
+      }
+    }
+  ],
+  "prompt": [
+    {
+      "name": "prompt_includes_profile_temporal_and_sentiment",
+      "turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        },
+        {
+          "user": "My name is Mark.",
+          "agent": "Noted."
+        },
+        {
+          "user": "Hello",
+          "agent": "Hi there."
+        }
+      ],
+      "query": "I am frustrated. What do I prefer?",
+      "expected": {
+        "prompt_contains": [
+          "As of now:",
+          "Day frame of reference:",
+          "Detected user sentiment: negative",
+          "User profile:",
+          "preference.general: oat milk",
+          "identity.name: Mark"
+        ],
+        "factual_count_at_least": 0,
+        "contextual_count_at_least": 0
+      }
+    },
+    {
+      "name": "prompt_drops_nondurable_context_when_profile_exists",
+      "turns": [
+        {
+          "user": "I prefer oat milk.",
+          "agent": "Noted."
+        },
+        {
+          "user": "Hello",
+          "agent": "Hi there."
+        }
+      ],
+      "query": "Hello",
+      "expected": {
+        "prompt_contains": [
+          "User profile:",
+          "preference.general: oat milk",
+          "Additional recalled memory:",
+          "- none"
+        ],
+        "factual_count_at_least": 0,
+        "contextual_count_at_least": 0,
+        "dropped_contextual_count_at_least": 1
+      }
+    }
+  ]
+}

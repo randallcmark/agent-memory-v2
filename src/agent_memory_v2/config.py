@@ -31,6 +31,14 @@ class AppConfig:
         return self.raw.get("sidecar", {})
 
     @property
+    def semantic_router(self) -> dict:
+        return self.raw.get("semantic_router", {})
+
+    @property
+    def structured_extractor(self) -> dict:
+        return self.raw.get("structured_extractor", {})
+
+    @property
     def profile(self) -> dict:
         return self.raw.get("profile", {})
 

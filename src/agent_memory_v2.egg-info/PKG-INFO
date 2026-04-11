@@ -17,77 +17,119 @@ Requires-Dist: sentence-transformers>=3.0; extra == "embeddings"
 
 # Agent Memory V2
 
-`agent_memory_v2` is a clean rebuild of the original agent memory project.
+`agent_memory_v2` is a local-first persistent memory layer for an LLM agent.
 
-The objective is unchanged:
+The project objective is to make a locally running model more useful across
+sessions by giving it a structured memory system that can:
 
 1. process interactions,
-2. persist useful memory,
-3. retrieve relevant memory,
-4. inject retrieved memory into subsequent prompts,
-5. run against a local Ollama-hosted `llama3:8b` model.
+2. extract durable user information,
+3. persist memory across sessions,
+4. retrieve relevant prior memory,
+5. inject that memory back into future prompts.
 
-## Scope of Milestone 1
+The current runtime target is a fully local stack built around:
 
-Milestone 1 establishes a narrow, testable baseline:
+- `llama3:8b` via Ollama for generation
+- `nomic-embed-text` via Ollama for embeddings
+- FAISS for vector storage
 
-- single local LLM provider: Ollama
-- single embedding path: sentence-transformers
-- single vector store: FAISS
-- deterministic memory record model
-- prompt injection based on recalled memory
-- simple CLI loop for manual verification
+## Why This Exists
 
-This version deliberately excludes advanced features for now:
+Most local chat setups are stateless. Once a session ends, the agent forgets
+preferences, facts, tasks, and prior context.
 
-- sidecar anchor stores
-- multi-provider abstraction
-- LLM summarization-based preprocessing
-- warm-start optimization
-- rich memory classification beyond base metadata
+This project is an attempt to fix that with a practical memory architecture for
+local agents:
 
-## Install
+- conversation memory for recent contextual recall
+- durable fact/preference storage for long-lived user data
+- profile derivation from recalled durable memory
+- prompt injection with temporal grounding and sentiment-aware tuning
+- maintenance flows for aging, pruning, and rebuilds
 
-Base install for development and tests:
+## Current Capabilities
+
+The current baseline supports:
+
+- local Ollama-backed chat
+- persistent memory across sessions
+- multi-user profile segregation
+- rule-based memory classification
+- durable sidecar storage for facts and preferences
+- structured multi-source recall
+- derived user profile injection
+- temporal context injection
+- sentiment-aware response guidance
+- maintenance, rebuild, backup, restore, and inspection tooling
+- deterministic regression evaluation for core memory stages
+- live Ollama evaluation for real memory-use and sentiment-behavior checks
+- scenario-driven qualitative review with saved prompt/recall/response artifacts
+
+## Repo Structure
+
+- `src/agent_memory_v2/`: application code
+- `config/`: runtime configuration
+- `scripts/`: shell entrypoints
+- `tests/`: unit and integration coverage
+- `seeds/`: generic non-sensitive seed data
+
+## Quick Start
+
+From the project root:
 
 ```bash
-pip install -e '.[dev]'
+make doctor
+make chat
 ```
 
-Embedding model support:
+Useful commands:
 
 ```bash
-pip install -e '.[dev,embeddings]'
+make chat
+make stats
+make list
+make list-sidecar
+make profile
+make doctor
 ```
 
-The embedding dependency is separated so the test harness and project skeleton
-can be bootstrapped before model-layer compatibility is finalized.
+For named-user operation:
 
-## Layout
-
-```text
-agent_memory_v2/
-├── config/
-│   └── settings.yaml
-├── src/
-│   └── agent_memory_v2/
-│       ├── __init__.py
-│       ├── config.py
-│       ├── embeddings.py
-│       ├── models.py
-│       ├── ollama.py
-│       ├── pipeline.py
-│       └── store.py
-├── tests/
-│   ├── integration/
-│   └── unit/
-└── pyproject.toml
+```bash
+make chat ARGS="--user mark"
 ```
 
-## Intended Next Steps
+## Debug and Analysis
 
-1. create a clean Python 3.13 virtualenv,
-2. install dependencies,
-3. run the test suite,
-4. wire the CLI to a local Ollama instance,
-5. harden the ingestion and recall path before adding richer preprocessing.
+The project also includes stage-by-stage tooling so you can inspect the pipeline
+independently:
+
+```bash
+make classify
+make recall
+make prompt
+make generate
+make ingest
+make scenario-run
+make scenario-show
+make scenario-compare
+```
+
+These tools are intended for qualitative analysis, debugging, and regression
+work rather than normal end-user operation.
+
+## Documentation
+
+- `TOOLS.md`: operational and debug workflows
+- `STATUS.md`: current implementation state
+- `ROADMAP.md`: planned work and completed milestones
+- `SEMANTIC_EXTRACTION.md`: concrete design for the next hybrid durable-memory extraction upgrade
+- `PUBLISHING.md`: repo sanitisation and publication flow
+- `skills/`: project-contained Codex skills for operations and quality workflows
+- `INTERNAL_README.md`: detailed internal/operator notes preserved from active development
+
+## Status
+
+This project is under active development. The core local memory loop is working,
+and the current focus is improving quality, evaluation, and retrieval behavior.

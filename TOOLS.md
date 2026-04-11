@@ -85,6 +85,34 @@ Classification only:
 make classify ARGS="--text 'I prefer oat milk.'"
 ```
 
+Classification plus semantic candidate routing:
+
+```bash
+make classify ARGS="--text 'I am based in Edinburgh in the UK.' --semantic"
+make classify ARGS="--text 'The Meadows has cherry blossom trees.' --semantic"
+make classify ARGS="--text 'What day is it today?' --semantic"
+```
+
+The semantic path reports the best `semantic_candidate` for generic non-durable
+rule-classifier misses.
+
+Structured extraction:
+
+```bash
+make classify ARGS="--text 'I am based in Edinburgh in the UK.' --extract"
+make ingest ARGS="--text 'I am based in Edinburgh in the UK.' --reply 'Noted.' --conversation-id extraction-debug"
+make list ARGS="--query Edinburgh --limit 5"
+make list-sidecar ARGS="--limit 10"
+make profile
+```
+
+The `--extract` path runs the Phase 2 constrained JSON extractor after semantic
+routing finds an above-threshold durable candidate. A record is promoted into
+the sidecar/profile only when the extractor returns valid JSON, a supported
+`profile_key`, a compact `extracted_value`, and confidence above the configured
+admission threshold. Rejected extraction attempts remain traceable in
+`structured_extraction` metadata.
+
 Recall only:
 
 ```bash
@@ -123,6 +151,87 @@ Raw generation only:
 make generate ARGS="--prompt 'Reply with exactly OK.'"
 ```
 
+Deterministic regression evaluation:
+
+```bash
+make eval-classification
+make eval-semantic
+make eval-sentiment
+make eval-profile
+make eval-recall
+make eval-prompt
+make eval-all
+make eval-history
+make eval-compare
+```
+
+These eval commands run against isolated temporary storage and force the
+deterministic hash embedding path so they are stable regression checks rather
+than live-environment Ollama quality probes.
+
+To persist compact deterministic summaries and compare runs:
+
+```bash
+make eval-all ARGS="--record-history"
+make eval-history
+make eval-compare
+```
+
+Live Ollama evaluation:
+
+```bash
+make live-eval-memory
+make live-eval-sentiment
+make live-eval-all
+make live-eval-history
+make live-eval-compare
+```
+
+These commands run against the real local runtime stack:
+
+1. real Ollama generation model
+2. real configured embedding provider
+3. isolated temporary memory/profile/sidecar state
+4. checked-in live eval dataset
+
+Artifacts for failed cases, or for all cases when `--save-all` is used, are
+written under `artifacts/live_eval/...` and include:
+
+1. recalled items
+2. selected prompt context
+3. final prompt
+4. raw model response
+
+To persist compact live-run summaries and compare them over time:
+
+```bash
+make live-eval-all ARGS="--record-history --save-all"
+make live-eval-history
+make live-eval-compare
+```
+
+Scenario-driven qualitative review:
+
+```bash
+make scenario-list
+make scenario-run ARGS="--scenario negative_sentiment_preference"
+make scenario-run ARGS="--scenario semantic_location_candidate"
+make scenario-run ARGS="--scenario semantic_world_context_not_profile"
+make scenario-show ARGS="--run-id 20260329_211535_negative_sentiment_preference"
+make scenario-compare ARGS="--run-a <run-a> --run-b <run-b>"
+```
+
+These commands are intended for subjective review rather than score-based
+regression. Each scenario run stores a bundle under `artifacts/scenarios/...`
+containing:
+
+1. setup-turn ingestion details
+2. merged recall output
+3. prompt context
+4. final prompt
+5. live model response
+6. scenario review notes
+
 Store inspection:
 
 ```bash
@@ -146,18 +255,73 @@ Recommended debug routine:
 1. `make backup ARGS="--output backups/pre-debug.zip"`
 2. `make ingest ARGS="--text 'My name is Mark.' --reply 'Noted.'"`
 3. `make classify ARGS="--text 'My name is Mark.'"`
-4. `make recall ARGS="--text 'What is my name?'"`
-5. `make prompt ARGS="--text 'What is my name?'"`
-6. `make generate ARGS="--prompt-file /path/to/prompt.txt"`
-7. `make list ARGS="--memory-class fact --limit 10"`
-8. `make list-sidecar ARGS="--limit 10"`
-9. `make profile`
-10. `make aging-report`
-11. `make prune-dry-run`
-12. `make prune`
-13. `make maintenance-status`
-14. `make maintain`
-15. `make restore ARGS="--input backups/pre-debug.zip --force"`
+4. `make classify ARGS="--text 'I am based in Edinburgh in the UK.' --semantic"`
+5. `make recall ARGS="--text 'What is my name?'"`
+6. `make prompt ARGS="--text 'What is my name?'"`
+7. `make generate ARGS="--prompt-file /path/to/prompt.txt"`
+8. `make list ARGS="--memory-class fact --limit 10"`
+9. `make list-sidecar ARGS="--limit 10"`
+10. `make profile`
+11. `make aging-report`
+12. `make prune-dry-run`
+13. `make prune`
+14. `make maintenance-status`
+15. `make maintain`
+16. `make restore ARGS="--input backups/pre-debug.zip --force"`
+
+Recommended regression routine:
+
+1. `make eval-classification`
+2. `make eval-semantic`
+3. `make eval-sentiment`
+4. `make eval-profile`
+5. `make eval-recall`
+6. `make eval-prompt`
+7. `make eval-all`
+8. `make eval-all ARGS="--record-history"`
+9. `make eval-compare`
+
+Recommended live-quality routine:
+
+1. `make smoke`
+2. `make embedding-smoke`
+3. `make live-eval-memory`
+4. `make live-eval-sentiment`
+5. `make live-eval-all`
+6. `make live-eval-all ARGS="--record-history --save-all"`
+7. `make live-eval-compare`
+
+Recommended semantic-extraction review routine:
+
+1. `make classify ARGS="--text 'I am based in Edinburgh in the UK.' --semantic"`
+2. `make classify ARGS="--text 'I am based in Edinburgh in the UK.' --extract"`
+3. `make classify ARGS="--text 'The Meadows has cherry blossom trees.' --extract"`
+4. `make ingest ARGS="--text 'I am based in Edinburgh in the UK.' --reply 'Noted.' --conversation-id semantic-debug"`
+5. `make list ARGS="--query Edinburgh --limit 5"`
+6. `make list-sidecar ARGS="--limit 10"`
+7. `make profile`
+8. `make scenario-run ARGS="--scenario semantic_location_candidate"`
+9. `make scenario-show ARGS="--run-id <semantic_location_run_id>"`
+10. `make rebuild`
+11. `make list-sidecar ARGS="--limit 10"`
+12. `make profile`
+
+For Phase 2, the expected qualitative result for durable user facts is an
+accepted `structured_extraction`, a promoted `memory_class`, and a corresponding
+sidecar/profile write. Non-durable semantic candidates such as local-world facts
+should still remain out of the sidecar/profile.
+
+Rebuild now replays the same hybrid extraction policy from the interaction log,
+so `make rebuild` should preserve accepted structured extractions rather than
+falling back to the older rule-only classifier behavior.
+
+Recommended qualitative routine:
+
+1. `make scenario-list`
+2. `make scenario-run ARGS="--scenario preference_recall"`
+3. `make scenario-run ARGS="--scenario conflicting_fact_latest_wins"`
+4. `make scenario-show ARGS="--run-id <saved-run-id>"`
+5. `make scenario-compare ARGS="--run-a <run-a> --run-b <run-b>"`
 
 ## Traceability
 
@@ -194,6 +358,22 @@ When a stage looks wrong, use this map to jump directly to the owning module.
 `make generate`:
 - ownership: [ollama.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/ollama.py)
 - entrypoint: [generate_cli.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/generate_cli.py)
+
+`make eval-classification`, `make eval-sentiment`, `make eval-profile`, `make eval-recall`, `make eval-prompt`, `make eval-all`, `make eval-history`, `make eval-compare`:
+- ownership: [eval_cli.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/eval_cli.py)
+- dataset: [baseline.json](/Volumes/Media/Repository/agent_memory_v2/evals/baseline.json)
+- pipeline logic under test: [pipeline.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/pipeline.py)
+
+`make live-eval-memory`, `make live-eval-sentiment`, `make live-eval-all`, `make live-eval-history`, `make live-eval-compare`:
+- ownership: [live_eval_cli.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/live_eval_cli.py)
+- dataset: [live_ollama.json](/Volumes/Media/Repository/agent_memory_v2/evals/live_ollama.json)
+- generation path: [ollama.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/ollama.py)
+- prompt path: [pipeline.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/pipeline.py)
+
+`make scenario-list`, `make scenario-run`, `make scenario-show`, `make scenario-compare`:
+- ownership: [scenario_cli.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/scenario_cli.py)
+- dataset: [scenarios.json](/Volumes/Media/Repository/agent_memory_v2/evals/scenarios.json)
+- artifact output: `artifacts/scenarios/...`
 
 `make stats`, `make list`, `make rebuild`, `make reset`:
 - ownership: [admin.py](/Volumes/Media/Repository/agent_memory_v2/src/agent_memory_v2/admin.py)

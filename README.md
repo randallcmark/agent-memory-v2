@@ -45,6 +45,9 @@ The current baseline supports:
 - temporal context injection
 - sentiment-aware response guidance
 - maintenance, rebuild, backup, restore, and inspection tooling
+- deterministic regression evaluation for core memory stages
+- live Ollama evaluation for real memory-use and sentiment-behavior checks
+- scenario-driven qualitative review with saved prompt/recall/response artifacts
 
 ## Repo Structure
 
@@ -91,6 +94,9 @@ make recall
 make prompt
 make generate
 make ingest
+make scenario-run
+make scenario-show
+make scenario-compare
 ```
 
 These tools are intended for qualitative analysis, debugging, and regression
@@ -101,7 +107,9 @@ work rather than normal end-user operation.
 - `TOOLS.md`: operational and debug workflows
 - `STATUS.md`: current implementation state
 - `ROADMAP.md`: planned work and completed milestones
+- `SEMANTIC_EXTRACTION.md`: concrete design for the next hybrid durable-memory extraction upgrade
 - `PUBLISHING.md`: repo sanitisation and publication flow
+- `skills/`: project-contained Codex skills for operations and quality workflows
 - `INTERNAL_README.md`: detailed internal/operator notes preserved from active development
 
 ## Status

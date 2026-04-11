@@ -33,6 +33,18 @@ class StubOllama:
         return "stub-response"
 
 
+class StubExtractorClient:
+    def __init__(self, profile) -> None:
+        self.profile = profile
+
+    def generate(self, prompt: str) -> str:
+        return (
+            '{"memory_class":"fact","durable":true,"profile_key":"identity.location",'
+            '"extracted_value":"Edinburgh in the UK","confidence":0.9,'
+            '"supersedes_profile_key":"identity.location"}'
+        )
+
+
 def make_config(tmp_path: Path) -> AppConfig:
     return AppConfig(
         root_dir=tmp_path,
@@ -146,6 +158,54 @@ def test_rebuild_store_reclassifies_historical_logs(tmp_path: Path, monkeypatch)
     assert items[0]["extracted_value"] == "oat milk"
     assert items[0]["metadata"]["classification_confidence"] >= 0.9
     assert items[0]["metadata"]["profile_key"] == "preference.general"
+
+
+def test_rebuild_store_runs_hybrid_extraction_for_semantic_candidates(tmp_path: Path, monkeypatch):
+    config = make_config(tmp_path)
+    config.raw["embeddings"] = {"provider": "hash", "model": "hash", "dimensions": 128}
+    config.raw["memory"]["embedding_dim"] = 128
+    config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}
+    config.raw["structured_extractor"] = {
+        "enabled": True,
+        "admission_threshold": 0.75,
+        "max_value_chars": 160,
+        "allowed_profile_keys": ["identity.location"],
+    }
+    config.raw["sidecar"] = {
+        "enabled": True,
+        "top_k": 2,
+        "similarity_threshold": 0.2,
+        "index_path": "data/sidecar/test.index",
+        "metadata_path": "data/sidecar/test.json",
+        "store_classes": ["preference", "fact", "task"],
+    }
+    config.raw["profile"] = {"enabled": True, "path": "data/profile/test.json", "inject": True}
+    interaction_log = config.resolve_path(config.memory["interaction_log_path"])
+    interaction_log.parent.mkdir(parents=True, exist_ok=True)
+    interaction_log.write_text(
+        '{"role":"turn","text":"User: I am based in Edinburgh in the UK.\\nAgent: noted",'
+        '"summary":"I am based in Edinburgh in the UK.",'
+        '"timestamp":"2026-03-29T09:00:00+00:00","message_id":"m1",'
+        '"turn_id":"t1","conversation_id":"default",'
+        '"metadata":{"kind":"turn_memory","memory_class":"turn"}}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("agent_memory_v2.admin.OllamaClient", StubExtractorClient)
+
+    rebuild_result = rebuild_store(config)
+    items = list_memories(config, limit=5)
+    sidecar_items = list_sidecar_memories(config, limit=5)
+    profile = get_profile(config)
+
+    assert rebuild_result["rebuilt"] == 1
+    assert rebuild_result["sidecar_rebuilt"] == 1
+    assert items[0]["metadata"]["classification_source"] == "structured_extractor"
+    assert items[0]["memory_class"] == "fact"
+    assert items[0]["extracted_value"] == "Edinburgh in the UK"
+    assert items[0]["metadata"]["rule_classification"]["memory_class"] == "turn"
+    assert len(sidecar_items) == 1
+    assert sidecar_items[0]["text"] == "Edinburgh in the UK"
+    assert profile["facts"]["identity.location"]["value"] == "Edinburgh in the UK"
 
 
 def test_list_memories_supports_filters(tmp_path: Path):

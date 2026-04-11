@@ -48,6 +48,7 @@ def test_generate_uses_generate_endpoint(monkeypatch):
     def fake_post(url, json, timeout):
         assert url.endswith("/api/generate")
         assert json["model"] == "llama3:8b"
+        assert json["raw"] is False
         return StubResponse({"response": "OK"})
 
     monkeypatch.setattr("agent_memory_v2.ollama.requests.post", fake_post)
