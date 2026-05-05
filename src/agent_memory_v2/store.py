@@ -48,6 +48,14 @@ class MemoryStore:
         self.records = []
         self._save()
 
+    def update_record_metadata(self, memory_id: str, updates: dict) -> bool:
+        for record in self.records:
+            if record.memory_id == memory_id:
+                record.metadata.update(updates)
+                self._save()
+                return True
+        return False
+
     def search(
         self,
         query_vector: np.ndarray,

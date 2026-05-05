@@ -23,16 +23,16 @@ _PREFERENCE_PATTERNS = [
     re.compile(r"\bmy favourite\s+(?P<subject>\w+)\s+is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
 ]
 
-_FACT_PATTERNS = [
-    re.compile(r"\bI'm from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bI am from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bmy name is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bmy birthday is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bI live in\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bI work as\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bI work at\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bI am allergic to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bremember that I am\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+_FACT_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"\bI'm from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.origin"),
+    (re.compile(r"\bI am from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.origin"),
+    (re.compile(r"\bmy name is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.name"),
+    (re.compile(r"\bmy birthday is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.birthday"),
+    (re.compile(r"\bI live in\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.location"),
+    (re.compile(r"\bI work as\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.occupation"),
+    (re.compile(r"\bI work at\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.employer"),
+    (re.compile(r"\bI am allergic to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.allergy"),
+    (re.compile(r"\bremember that I am\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.general"),
 ]
 
 _TASK_PATTERNS = [
@@ -41,7 +41,10 @@ _TASK_PATTERNS = [
     re.compile(r"\bplease remind me to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
     re.compile(r"\bremind me to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
     re.compile(r"\bI should\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bI must\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+    re.compile(
+        r"\bI must(?!\s+(?:say|admit|confess|stress|emphasise|emphasize|note|point out))\s+(?P<value>.+?)(?:[.!?]|$)",
+        re.IGNORECASE,
+    ),
 ]
 
 _TASK_RESOLUTION_PATTERNS = [
@@ -95,7 +98,7 @@ def classify_text(text: str, *, default_class: str = "turn") -> ClassificationRe
                 profile_key,
             )
 
-    for pattern in _FACT_PATTERNS:
+    for pattern, profile_key in _FACT_PATTERNS:
         match = pattern.search(cleaned)
         if match:
             return ClassificationResult(
@@ -104,17 +107,7 @@ def classify_text(text: str, *, default_class: str = "turn") -> ClassificationRe
                 0.90,
                 True,
                 "user_fact",
-                {
-                    "my name is": "identity.name",
-                    "i'm from": "identity.origin",
-                    "i am from": "identity.origin",
-                    "my birthday is": "identity.birthday",
-                    "i live in": "identity.location",
-                    "i work as": "identity.occupation",
-                    "i work at": "identity.employer",
-                    "i am allergic to": "identity.allergy",
-                    "remember that i am": "identity.general",
-                }.get(match.group(0).split(match.group("value"))[0].strip().lower(), "identity.general"),
+                profile_key,
             )
 
     for pattern in _TASK_PATTERNS:

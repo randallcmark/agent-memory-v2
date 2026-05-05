@@ -40,6 +40,23 @@ def age_bucket(days: float | None) -> str:
     return "90d+"
 
 
+def effective_age_days(
+    record: MemoryRecord,
+    *,
+    now_dt: datetime | None = None,
+) -> float | None:
+    now_dt = now_dt or datetime.now(timezone.utc)
+    created = parse_timestamp(record.timestamp)
+    last_recalled = parse_timestamp(record.metadata.get("last_recalled_at"))
+    most_recent = max(
+        (dt for dt in (created, last_recalled) if dt is not None),
+        default=None,
+    )
+    if most_recent is None:
+        return None
+    return max((now_dt - most_recent).total_seconds(), 0.0) / 86400.0
+
+
 def age_penalty(
     *,
     memory_class: str,
@@ -88,12 +105,17 @@ def prune_dry_run_decision(
     prune_cfg = config.aging.get("prune", {}) or {}
     ephemeral_ttl = float(prune_cfg.get("ephemeral_turn_ttl_days", 14))
     task_ttl = float(prune_cfg.get("task_ttl_days", 90))
+    min_recall_count = int(prune_cfg.get("min_recall_count_to_keep", 3))
+    recall_count = int(record.metadata.get("recall_count", 0))
 
     decision = "keep"
     reason = "retained"
     if age is None:
         decision = "review"
         reason = "missing_timestamp"
+    elif recall_count >= min_recall_count:
+        decision = "keep"
+        reason = "actively_recalled"
     elif not durable and memory_class in {"turn", "message"} and age > ephemeral_ttl:
         decision = "prune"
         reason = "stale_ephemeral"
