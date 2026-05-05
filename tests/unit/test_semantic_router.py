@@ -57,3 +57,69 @@ def test_semantic_router_reports_below_threshold(encoder: HashEmbeddingEncoder):
 
 def test_semantic_router_ignores_empty_text(encoder: HashEmbeddingEncoder):
     assert route_semantic_candidate("   ", encoder) is None
+
+
+# ---------------------------------------------------------------------------
+# New prototypes — each tested with an exact example string from its definition
+# so the hash encoder gives cosine similarity 1.0 against that prototype
+# ---------------------------------------------------------------------------
+
+
+def test_semantic_router_detects_dietary_restriction(encoder: HashEmbeddingEncoder):
+    result = route_semantic_candidate("I'm vegetarian.", encoder, threshold=0.72)
+
+    assert result is not None
+    assert result.candidate_key == "identity.dietary"
+    assert result.durable_candidate is True
+    assert result.above_threshold is True
+
+
+def test_semantic_router_detects_health_condition(encoder: HashEmbeddingEncoder):
+    result = route_semantic_candidate("I'm allergic to nuts.", encoder, threshold=0.72)
+
+    assert result is not None
+    assert result.candidate_key == "identity.health"
+    assert result.durable_candidate is True
+    assert result.above_threshold is True
+
+
+def test_semantic_router_detects_relationship(encoder: HashEmbeddingEncoder):
+    result = route_semantic_candidate("My partner's name is Sarah.", encoder, threshold=0.72)
+
+    assert result is not None
+    assert result.candidate_key == "identity.relationship"
+    assert result.durable_candidate is True
+    assert result.above_threshold is True
+
+
+def test_semantic_router_detects_communication_preference(encoder: HashEmbeddingEncoder):
+    result = route_semantic_candidate("I prefer short answers.", encoder, threshold=0.72)
+
+    assert result is not None
+    assert result.candidate_key == "preference.communication"
+    assert result.durable_candidate is True
+    assert result.above_threshold is True
+
+
+def test_semantic_router_detects_schedule_preference(encoder: HashEmbeddingEncoder):
+    result = route_semantic_candidate("I work best in the mornings.", encoder, threshold=0.72)
+
+    assert result is not None
+    assert result.candidate_key == "preference.schedule"
+    assert result.durable_candidate is True
+    assert result.above_threshold is True
+
+
+def test_new_prototypes_are_all_durable_candidates(encoder: HashEmbeddingEncoder):
+    durable_examples = [
+        "I'm vegetarian.",
+        "I'm allergic to nuts.",
+        "My partner's name is Sarah.",
+        "I prefer short answers.",
+        "I work best in the mornings.",
+    ]
+    for text in durable_examples:
+        result = route_semantic_candidate(text, encoder, threshold=0.72)
+        assert result is not None and result.durable_candidate is True, (
+            f"'{text}' should route to a durable candidate"
+        )
