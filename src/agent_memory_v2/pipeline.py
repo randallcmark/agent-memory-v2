@@ -7,7 +7,7 @@ import re
 import sys
 from datetime import datetime, timedelta, timezone
 
-from agent_memory_v2.aging import age_penalty, parse_timestamp
+from agent_memory_v2.aging import age_penalty, effective_age_days, parse_timestamp
 from agent_memory_v2.classifier import (
     ClassificationResult,
     classify_text,
@@ -16,7 +16,7 @@ from agent_memory_v2.classifier import (
 )
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.embeddings import EmbeddingEncoder, build_encoder
-from agent_memory_v2.models import MemoryRecord, Message
+from agent_memory_v2.models import MemoryRecord, Message, RecallResult
 from agent_memory_v2.maintenance import mark_interaction, maintenance_status, run_maintenance
 from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 from agent_memory_v2.profile import UserProfileStore
@@ -170,14 +170,10 @@ def _store_kind_bonus(kind: str | None) -> float:
 
 
 def _age_penalty_for_record(record: MemoryRecord, config: AppConfig) -> float:
-    parsed = _parse_timestamp(record.timestamp)
-    age_days_value = None
-    if parsed is not None:
-        age_days_value = max((datetime.now(timezone.utc) - parsed).total_seconds(), 0.0) / 86400.0
     return age_penalty(
         memory_class=record.metadata.get("memory_class", record.role),
         durable=bool(record.metadata.get("durable", False)),
-        age_days_value=age_days_value,
+        age_days_value=effective_age_days(record),
         config=config,
     )
 
@@ -378,6 +374,7 @@ class MemoryPipeline:
             role="turn",
             text=text,
             summary=summary,
+            embed_text=text,
             timestamp=agent_message.timestamp,
             conversation_id=user_message.conversation_id,
             turn_id=user_message.turn_id,
@@ -425,7 +422,15 @@ class MemoryPipeline:
                     "identity.name",
                     "identity.occupation",
                     "identity.origin",
+                    "identity.dietary",
+                    "identity.health",
+                    "identity.relationship",
+                    "identity.birthday",
+                    "identity.employer",
+                    "identity.allergy",
                     "preference.general",
+                    "preference.communication",
+                    "preference.schedule",
                     "task.general",
                 ],
             )
@@ -467,8 +472,9 @@ class MemoryPipeline:
         turn_id: str,
         message_id: str,
         metadata: dict,
+        embed_text: str | None = None,
     ) -> MemoryRecord:
-        vector = self.encoder.encode(summary)
+        vector = self.encoder.encode(embed_text if embed_text is not None else summary)
         record = MemoryRecord(
             memory_id=message_id,
             role=role,
@@ -482,7 +488,9 @@ class MemoryPipeline:
         )
         self.store.add(record, vector)
         if self.sidecar_store is not None and _should_store_in_sidecar(self.config, metadata):
-            self.sidecar_store.add(_build_sidecar_record(record), vector)
+            sidecar_record = _build_sidecar_record(record)
+            sidecar_vector = self.encoder.encode(summary)
+            self.sidecar_store.add(sidecar_record, sidecar_vector)
             if self.profile_store is not None:
                 self.profile_store.rebuild_from_records(self.sidecar_store.records)
         self._append_log(
@@ -522,8 +530,10 @@ class MemoryPipeline:
                     exclude_message_id=message.message_id,
                 )
             )
-        ranked = sorted(results, key=self._rank_key, reverse=True)
+        query_route = self._query_intent_route(message.text)
+        ranked = sorted(results, key=lambda item: self._rank_key(item, query_route), reverse=True)
         deduped: list[dict] = []
+        recalled_items: list[RecallResult] = []
         seen_sources: set[str] = set()
         for item in ranked:
             payload = self._recall_payload(item)
@@ -532,11 +542,46 @@ class MemoryPipeline:
                 continue
             seen_sources.add(source_id)
             deduped.append(payload)
+            recalled_items.append(item)
             if len(deduped) >= int(self.config.memory["top_k"]):
                 break
+        self._track_recall(recalled_items)
         return deduped
 
-    def _rank_key(self, item) -> tuple[float, float]:
+    def _track_recall(self, items: list[RecallResult]) -> None:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for item in items:
+            record = item.record
+            recall_count = int(record.metadata.get("recall_count", 0)) + 1
+            updates = {"last_recalled_at": now_iso, "recall_count": recall_count}
+            store = (
+                self.sidecar_store
+                if record.metadata.get("kind") == "sidecar_memory"
+                else self.store
+            )
+            store.update_record_metadata(record.memory_id, updates)
+
+    def _query_intent_route(self, text: str) -> SemanticRouteResult | None:
+        router_cfg = self.config.semantic_router
+        if not router_cfg.get("enabled", False):
+            return None
+        return route_semantic_candidate(
+            text,
+            self.encoder,
+            threshold=float(router_cfg.get("threshold", 0.72)),
+        )
+
+    def _query_intent_bonus(
+        self, item, query_route: SemanticRouteResult | None
+    ) -> float:
+        if query_route is None or not query_route.above_threshold or not query_route.durable_candidate:
+            return 0.0
+        record_profile_key = item.record.metadata.get("profile_key")
+        if record_profile_key and record_profile_key == query_route.candidate_key:
+            return 0.04
+        return 0.0
+
+    def _rank_key(self, item, query_route: SemanticRouteResult | None = None) -> tuple[float, float]:
         rank_score = (
             float(item.score)
             + class_priority(item.record.metadata.get("memory_class", item.record.role))
@@ -544,6 +589,7 @@ class MemoryPipeline:
             + _store_kind_bonus(item.record.metadata.get("kind"))
             + _recency_bonus(item.record.timestamp)
             + _age_penalty_for_record(item.record, self.config)
+            + self._query_intent_bonus(item, query_route)
         )
         return rank_score, float(item.score)
 

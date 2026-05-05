@@ -85,7 +85,8 @@ def _compact_value(value: object, max_chars: int) -> str | None:
     return cleaned
 
 
-def _build_prompt(text: str, route: SemanticRouteResult) -> str:
+def _build_prompt(text: str, route: SemanticRouteResult, allowed_keys: set[str]) -> str:
+    keys_str = "|".join(sorted(allowed_keys))
     return (
         "You extract durable memory from one user utterance.\n"
         "Return exactly one JSON object and no prose.\n\n"
@@ -93,7 +94,7 @@ def _build_prompt(text: str, route: SemanticRouteResult) -> str:
         "{\n"
         '  "memory_class": "fact|preference|task",\n'
         '  "durable": true,\n'
-        '  "profile_key": "identity.location|identity.name|identity.occupation|identity.origin|preference.general|task.general",\n'
+        f'  "profile_key": "{keys_str}",\n'
         '  "extracted_value": "short exact value from the user utterance",\n'
         '  "confidence": 0.0 to 1.0,\n'
         '  "supersedes_profile_key": "profile key or null"\n'
@@ -171,7 +172,7 @@ def extract_structured_memory(
     allowed_profile_keys: set[str],
     max_value_chars: int = 160,
 ) -> StructuredExtractionResult:
-    raw_response = generator.generate(_build_prompt(text, route))
+    raw_response = generator.generate(_build_prompt(text, route, allowed_profile_keys))
     try:
         parsed = _extract_json_object(raw_response)
     except ValueError as exc:
