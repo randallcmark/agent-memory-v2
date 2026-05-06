@@ -1,3 +1,4 @@
+version: 1
 app:
   name: agent_memory_v2
   timezone: Europe/London
@@ -52,7 +53,15 @@ structured_extractor:
     - identity.name
     - identity.occupation
     - identity.origin
+    - identity.dietary
+    - identity.health
+    - identity.relationship
+    - identity.birthday
+    - identity.employer
+    - identity.allergy
     - preference.general
+    - preference.communication
+    - preference.schedule
     - task.general
 profile:
   enabled: true
@@ -76,6 +85,7 @@ aging:
     resolved_task_ttl_days: 7
     dry_run_limit: 100
     archive_path: data/archive/pruned_memories.jsonl
+    min_recall_count_to_keep: 3
   sidecar:
     enabled: true
     archive_path: data/archive/pruned_sidecar.jsonl
@@ -96,6 +106,7 @@ prompting:
   inject_now: true
   factual_max_items: 3
   contextual_max_items: 2
+  max_context_chars: 3200
   dedupe_profile_facts: true
   drop_nondurable_contextual: true
   temporal_context:

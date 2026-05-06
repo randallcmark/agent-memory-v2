@@ -85,7 +85,8 @@ def _compact_value(value: object, max_chars: int) -> str | None:
     return cleaned
 
 
-def _build_prompt(text: str, route: SemanticRouteResult) -> str:
+def _build_prompt(text: str, route: SemanticRouteResult, allowed_keys: set[str]) -> str:
+    keys_str = "|".join(sorted(allowed_keys))
     return (
         "You extract durable memory from one user utterance.\n"
         "Return exactly one JSON object and no prose.\n\n"
@@ -93,7 +94,7 @@ def _build_prompt(text: str, route: SemanticRouteResult) -> str:
         "{\n"
         '  "memory_class": "fact|preference|task",\n'
         '  "durable": true,\n'
-        '  "profile_key": "identity.location|identity.name|identity.occupation|identity.origin|preference.general|task.general",\n'
+        f'  "profile_key": "{keys_str}",\n'
         '  "extracted_value": "short exact value from the user utterance",\n'
         '  "confidence": 0.0 to 1.0,\n'
         '  "supersedes_profile_key": "profile key or null"\n'
@@ -162,16 +163,26 @@ def validate_structured_extraction(
     )
 
 
+def _taxonomy_profile_keys() -> set[str]:
+    try:
+        from agent_memory_v2.taxonomy import get_taxonomy
+        return get_taxonomy().durable_profile_keys()
+    except Exception:
+        return set()
+
+
 def extract_structured_memory(
     text: str,
     route: SemanticRouteResult,
     generator: TextGenerator,
     *,
     admission_threshold: float,
-    allowed_profile_keys: set[str],
+    allowed_profile_keys: set[str] | None = None,
     max_value_chars: int = 160,
 ) -> StructuredExtractionResult:
-    raw_response = generator.generate(_build_prompt(text, route))
+    if allowed_profile_keys is None:
+        allowed_profile_keys = _taxonomy_profile_keys()
+    raw_response = generator.generate(_build_prompt(text, route, allowed_profile_keys))
     try:
         parsed = _extract_json_object(raw_response)
     except ValueError as exc:

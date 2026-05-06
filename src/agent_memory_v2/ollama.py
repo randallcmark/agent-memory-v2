@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 import requests
+
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True)
@@ -14,6 +17,29 @@ class OllamaProfile:
     max_tokens: int
     timeout_seconds: int
     raw_prompt: bool = False
+
+
+def _with_retry(
+    fn: Callable[[], _T],
+    *,
+    max_attempts: int = 3,
+    base_delay: float = 1.0,
+) -> _T:
+    """Retry fn on transient network errors with exponential backoff."""
+    for attempt in range(max_attempts):
+        try:
+            return fn()
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            if attempt == max_attempts - 1:
+                raise
+            time.sleep(base_delay * (2 ** attempt))
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code < 500:
+                raise
+            if attempt == max_attempts - 1:
+                raise
+            time.sleep(base_delay * (2 ** attempt))
+    raise RuntimeError("_with_retry: unreachable")  # pragma: no cover
 
 
 class OllamaClient:
@@ -109,34 +135,40 @@ class OllamaClient:
         return result
 
     def generate(self, prompt: str) -> str:
-        payload = {
-            "model": self.profile.model,
-            "prompt": prompt,
-            "stream": False,
-            "raw": self.profile.raw_prompt,
-            "options": {
-                "temperature": self.profile.temperature,
-                "num_predict": self.profile.max_tokens,
-            },
-        }
-        response = self._post("/api/generate", payload)
-        data = response.json()
-        text = (data.get("response") or "").strip()
-        if not text:
-            raise RuntimeError("Ollama returned an empty response")
-        return text
+        def _call() -> str:
+            payload = {
+                "model": self.profile.model,
+                "prompt": prompt,
+                "stream": False,
+                "raw": self.profile.raw_prompt,
+                "options": {
+                    "temperature": self.profile.temperature,
+                    "num_predict": self.profile.max_tokens,
+                },
+            }
+            response = self._post("/api/generate", payload)
+            data = response.json()
+            text = (data.get("response") or "").strip()
+            if not text:
+                raise RuntimeError("Ollama returned an empty response")
+            return text
+
+        return _with_retry(_call)
 
     def embed(self, text: str) -> list[float]:
-        payload = {
-            "model": self.profile.model,
-            "input": text,
-        }
-        response = self._post("/api/embed", payload)
-        data = response.json()
-        embeddings = data.get("embeddings") or []
-        if not embeddings or not isinstance(embeddings[0], list):
-            raise RuntimeError("Ollama returned no embeddings")
-        vector = embeddings[0]
-        if not vector:
-            raise RuntimeError("Ollama returned an empty embedding vector")
-        return vector
+        def _call() -> list[float]:
+            payload = {
+                "model": self.profile.model,
+                "input": text,
+            }
+            response = self._post("/api/embed", payload)
+            data = response.json()
+            embeddings = data.get("embeddings") or []
+            if not embeddings or not isinstance(embeddings[0], list):
+                raise RuntimeError("Ollama returned no embeddings")
+            vector = embeddings[0]
+            if not vector:
+                raise RuntimeError("Ollama returned an empty embedding vector")
+            return vector
+
+        return _with_retry(_call)

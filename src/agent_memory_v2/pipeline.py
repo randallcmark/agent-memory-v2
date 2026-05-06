@@ -7,7 +7,7 @@ import re
 import sys
 from datetime import datetime, timedelta, timezone
 
-from agent_memory_v2.aging import age_penalty, parse_timestamp
+from agent_memory_v2.aging import age_penalty, effective_age_days, parse_timestamp
 from agent_memory_v2.classifier import (
     ClassificationResult,
     classify_text,
@@ -16,7 +16,7 @@ from agent_memory_v2.classifier import (
 )
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.embeddings import EmbeddingEncoder, build_encoder
-from agent_memory_v2.models import MemoryRecord, Message
+from agent_memory_v2.models import SCHEMA_VERSION, MemoryRecord, Message, RecallResult
 from agent_memory_v2.maintenance import mark_interaction, maintenance_status, run_maintenance
 from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 from agent_memory_v2.profile import UserProfileStore
@@ -99,7 +99,18 @@ def _clean_memory_text(text: str) -> str:
     return cleaned.strip()
 
 
-def _resolve_timezone(config: AppConfig):
+def _resolve_timezone(config: AppConfig, profile: dict | None = None):
+    if profile is not None and ZoneInfo is not None:
+        tz_pref = (
+            profile.get("preferences", {})
+            .get("preference.timezone", {})
+            .get("value")
+        )
+        if tz_pref:
+            try:
+                return ZoneInfo(str(tz_pref))
+            except Exception:
+                pass
     tz_name = config.raw.get("app", {}).get("timezone")
     if tz_name and ZoneInfo is not None:
         try:
@@ -174,23 +185,19 @@ def _store_kind_bonus(kind: str | None) -> float:
 
 
 def _age_penalty_for_record(record: MemoryRecord, config: AppConfig) -> float:
-    parsed = _parse_timestamp(record.timestamp)
-    age_days_value = None
-    if parsed is not None:
-        age_days_value = max((datetime.now(timezone.utc) - parsed).total_seconds(), 0.0) / 86400.0
     return age_penalty(
         memory_class=record.metadata.get("memory_class", record.role),
         durable=bool(record.metadata.get("durable", False)),
-        age_days_value=age_days_value,
+        age_days_value=effective_age_days(record),
         config=config,
     )
 
 
-def _format_recalled_item(item: dict, config: AppConfig) -> str:
+def _format_recalled_item(item: dict, config: AppConfig, profile: dict | None = None) -> str:
     role = item["role"]
     score = item["score"]
     text = _clean_memory_text(item["text"])
-    tz = _resolve_timezone(config)
+    tz = _resolve_timezone(config, profile)
     now_dt = datetime.now(timezone.utc)
 
     suffix_parts: list[str] = [f"score={score:.3f}"]
@@ -244,6 +251,34 @@ def _dedupe_recalled_items(items: list[dict]) -> list[dict]:
     return result
 
 
+def _apply_char_budget(
+    factual: list[dict], contextual: list[dict], budget: int
+) -> tuple[list[dict], list[dict], bool]:
+    """Drop trailing items once accumulated text exceeds budget.
+
+    Always includes the first factual item regardless of size so callers
+    always receive something useful even when a single memory is verbose.
+    """
+    if budget <= 0:
+        return factual, contextual, False
+    used = 0
+    out_factual: list[dict] = []
+    for i, item in enumerate(factual):
+        chars = len(str(item.get("text", "")))
+        if i > 0 and used + chars > budget:
+            return out_factual, [], True
+        used += chars
+        out_factual.append(item)
+    out_contextual: list[dict] = []
+    for item in contextual:
+        chars = len(str(item.get("text", "")))
+        if used + chars > budget:
+            return out_factual, out_contextual, True
+        used += chars
+        out_contextual.append(item)
+    return out_factual, out_contextual, False
+
+
 def _contextual_prompt_filter(items: list[dict], *, allow_empty: bool = False) -> tuple[list[dict], list[dict]]:
     kept: list[dict] = []
     dropped: list[dict] = []
@@ -259,9 +294,9 @@ def _contextual_prompt_filter(items: list[dict], *, allow_empty: bool = False) -
     return items, []
 
 
-def _build_temporal_context(config: AppConfig) -> str:
+def _build_temporal_context(config: AppConfig, profile: dict | None = None) -> str:
     prompting = config.prompting
-    tz = _resolve_timezone(config)
+    tz = _resolve_timezone(config, profile)
     now_local = datetime.now(tz)
     lines: list[str] = []
 
@@ -382,6 +417,7 @@ class MemoryPipeline:
             role="turn",
             text=text,
             summary=summary,
+            embed_text=text,
             timestamp=agent_message.timestamp,
             conversation_id=user_message.conversation_id,
             turn_id=user_message.turn_id,
@@ -429,19 +465,30 @@ class MemoryPipeline:
                     "identity.name",
                     "identity.occupation",
                     "identity.origin",
+                    "identity.dietary",
+                    "identity.health",
+                    "identity.relationship",
+                    "identity.birthday",
+                    "identity.employer",
+                    "identity.allergy",
                     "preference.general",
+                    "preference.communication",
+                    "preference.schedule",
                     "task.general",
                 ],
             )
         )
-        extraction = extract_structured_memory(
-            text,
-            route,
-            self.ollama,
-            admission_threshold=float(extractor_cfg.get("admission_threshold", 0.75)),
-            allowed_profile_keys=allowed_profile_keys,
-            max_value_chars=int(extractor_cfg.get("max_value_chars", 160)),
-        )
+        try:
+            extraction = extract_structured_memory(
+                text,
+                route,
+                self.ollama,
+                admission_threshold=float(extractor_cfg.get("admission_threshold", 0.75)),
+                allowed_profile_keys=allowed_profile_keys,
+                max_value_chars=int(extractor_cfg.get("max_value_chars", 160)),
+            )
+        except Exception:
+            return {}
         metadata = {"structured_extraction": extraction.to_metadata()}
         if extraction.accepted:
             metadata.update(_classification_metadata(extraction.to_classification_result()))
@@ -460,6 +507,14 @@ class MemoryPipeline:
         metadata.update(extraction_metadata)
         return metadata
 
+    @staticmethod
+    def _taxonomy_version() -> int:
+        try:
+            from agent_memory_v2.taxonomy import get_taxonomy
+            return get_taxonomy().version
+        except Exception:
+            return 0
+
     def _store_memory(
         self,
         *,
@@ -471,8 +526,10 @@ class MemoryPipeline:
         turn_id: str,
         message_id: str,
         metadata: dict,
+        embed_text: str | None = None,
     ) -> MemoryRecord:
-        vector = self.encoder.encode(summary)
+        vector = self.encoder.encode(embed_text if embed_text is not None else summary)
+        metadata = {**metadata, "schema_version": SCHEMA_VERSION, "taxonomy_version": self._taxonomy_version()}
         record = MemoryRecord(
             memory_id=message_id,
             role=role,
@@ -490,7 +547,7 @@ class MemoryPipeline:
             sidecar_vector = self.encoder.encode(_sidecar_vector_text(sidecar_record))
             self.sidecar_store.add(sidecar_record, sidecar_vector)
             if self.profile_store is not None:
-                self.profile_store.rebuild_from_records(self.sidecar_store.records)
+                self.profile_store.update_from_record(sidecar_record)
         self._append_log(
             {
                 "role": role,
@@ -528,8 +585,10 @@ class MemoryPipeline:
                     exclude_message_id=message.message_id,
                 )
             )
-        ranked = sorted(results, key=self._rank_key, reverse=True)
+        query_route = self._query_intent_route(message.text)
+        ranked = sorted(results, key=lambda item: self._rank_key(item, query_route), reverse=True)
         deduped: list[dict] = []
+        recalled_items: list[RecallResult] = []
         seen_sources: set[str] = set()
         for item in ranked:
             payload = self._recall_payload(item)
@@ -538,11 +597,46 @@ class MemoryPipeline:
                 continue
             seen_sources.add(source_id)
             deduped.append(payload)
+            recalled_items.append(item)
             if len(deduped) >= int(self.config.memory["top_k"]):
                 break
+        self._track_recall(recalled_items)
         return deduped
 
-    def _rank_key(self, item) -> tuple[float, float]:
+    def _track_recall(self, items: list[RecallResult]) -> None:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for item in items:
+            record = item.record
+            recall_count = int(record.metadata.get("recall_count", 0)) + 1
+            updates = {"last_recalled_at": now_iso, "recall_count": recall_count}
+            store = (
+                self.sidecar_store
+                if record.metadata.get("kind") == "sidecar_memory"
+                else self.store
+            )
+            store.update_record_metadata(record.memory_id, updates)
+
+    def _query_intent_route(self, text: str) -> SemanticRouteResult | None:
+        router_cfg = self.config.semantic_router
+        if not router_cfg.get("enabled", False):
+            return None
+        return route_semantic_candidate(
+            text,
+            self.encoder,
+            threshold=float(router_cfg.get("threshold", 0.72)),
+        )
+
+    def _query_intent_bonus(
+        self, item, query_route: SemanticRouteResult | None
+    ) -> float:
+        if query_route is None or not query_route.above_threshold or not query_route.durable_candidate:
+            return 0.0
+        record_profile_key = item.record.metadata.get("profile_key")
+        if record_profile_key and record_profile_key == query_route.candidate_key:
+            return 0.04
+        return 0.0
+
+    def _rank_key(self, item, query_route: SemanticRouteResult | None = None) -> tuple[float, float]:
         rank_score = (
             float(item.score)
             + class_priority(item.record.metadata.get("memory_class", item.record.role))
@@ -550,6 +644,7 @@ class MemoryPipeline:
             + _store_kind_bonus(item.record.metadata.get("kind"))
             + _recency_bonus(item.record.timestamp)
             + _age_penalty_for_record(item.record, self.config)
+            + self._query_intent_bonus(item, query_route)
         )
         return rank_score, float(item.score)
 
@@ -606,16 +701,25 @@ class MemoryPipeline:
         factual = factual[:factual_limit]
         contextual = contextual[:contextual_limit]
 
+        char_budget = int(prompting_cfg.get("max_context_chars", 0))
+        char_budget_applied = False
+        if char_budget > 0:
+            factual, contextual, char_budget_applied = _apply_char_budget(
+                factual, contextual, char_budget
+            )
+
         return {
             "profile": profile,
             "factual": factual,
             "contextual": contextual,
             "dropped_contextual": dropped_contextual,
+            "char_budget_applied": char_budget_applied,
         }
 
     def build_prompt(self, message: Message, recalled: list[dict]) -> str:
         input_heading = self.config.prompting["input_heading"]
-        temporal_context = _build_temporal_context(self.config)
+        profile_for_tz = self.profile_store.load() if self.profile_store is not None else None
+        temporal_context = _build_temporal_context(self.config, profile_for_tz)
         prompt_context = self.prompt_context(recalled)
         sentiment = detect_sentiment(message.text)
         factual = prompt_context["factual"]
@@ -629,10 +733,10 @@ class MemoryPipeline:
 
         sections: list[str] = []
         if factual:
-            factual_lines = [_format_recalled_item(item, self.config) for item in factual]
+            factual_lines = [_format_recalled_item(item, self.config, profile_for_tz) for item in factual]
             sections.append("Relevant durable facts:\n" + "\n".join(factual_lines))
         if contextual:
-            context_lines = [_format_recalled_item(item, self.config) for item in contextual]
+            context_lines = [_format_recalled_item(item, self.config, profile_for_tz) for item in contextual]
             sections.append("Relevant conversation context:\n" + "\n".join(context_lines))
         if not sections:
             fallback_heading = (
@@ -665,7 +769,10 @@ class MemoryPipeline:
     def respond(self, message: Message) -> str:
         recalled = self.recall(message)
         prompt = self.build_prompt(message, recalled)
-        response = self.ollama.generate(prompt)
+        try:
+            response = self.ollama.generate(prompt)
+        except Exception:
+            return "I'm unable to respond right now — please try again."
         return response
 
     def maintenance_status(self) -> dict:

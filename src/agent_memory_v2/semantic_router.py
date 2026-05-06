@@ -40,7 +40,107 @@ class SemanticRouteResult:
         }
 
 
-PROTOTYPES: tuple[SemanticPrototype, ...] = (
+def _load_prototypes() -> tuple[SemanticPrototype, ...]:
+    try:
+        from agent_memory_v2.taxonomy import get_taxonomy
+        return get_taxonomy().to_prototypes()
+    except Exception:
+        return _FALLBACK_PROTOTYPES
+
+
+def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
+    left_norm = float(np.linalg.norm(left))
+    right_norm = float(np.linalg.norm(right))
+    if left_norm == 0.0 or right_norm == 0.0:
+        return 0.0
+    return float(np.dot(left, right) / (left_norm * right_norm))
+
+
+class SemanticRouter:
+    """Encodes all prototype examples once at construction; routes queries against cached vectors."""
+
+    def __init__(
+        self,
+        encoder: EmbeddingEncoder,
+        *,
+        prototypes: tuple[SemanticPrototype, ...] | None = None,
+        threshold: float = 0.72,
+    ) -> None:
+        self.encoder = encoder
+        self.prototypes = prototypes if prototypes is not None else _load_prototypes()
+        self.threshold = threshold
+        self._cache: list[tuple[SemanticPrototype, str, np.ndarray]] = [
+            (proto, example, encoder.encode(example))
+            for proto in self.prototypes
+            for example in proto.examples
+        ]
+
+    def route(self, text: str) -> SemanticRouteResult | None:
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return None
+        query_vector = self.encoder.encode(cleaned)
+        best: SemanticRouteResult | None = None
+        for proto, example, example_vector in self._cache:
+            score = _cosine_similarity(query_vector, example_vector)
+            if best is None or score > best.score:
+                best = SemanticRouteResult(
+                    candidate_key=proto.candidate_key,
+                    candidate_class=proto.candidate_class,
+                    description=proto.description,
+                    score=score,
+                    threshold=self.threshold,
+                    above_threshold=score >= self.threshold,
+                    durable_candidate=proto.durable_candidate,
+                    matched_example=example,
+                )
+        return best
+
+
+def route_semantic_candidate(
+    text: str,
+    encoder: EmbeddingEncoder,
+    *,
+    threshold: float = 0.72,
+    prototypes: tuple[SemanticPrototype, ...] | None = None,
+) -> SemanticRouteResult | None:
+    """Stateless routing helper; re-encodes examples on every call.
+
+    For repeated calls prefer SemanticRouter which pre-computes and caches
+    prototype vectors.
+    """
+    resolved = prototypes if prototypes is not None else _load_prototypes()
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return None
+
+    query_vector = encoder.encode(cleaned)
+    best: SemanticRouteResult | None = None
+
+    for prototype in resolved:
+        for example in prototype.examples:
+            score = _cosine_similarity(query_vector, encoder.encode(example))
+            if best is None or score > best.score:
+                best = SemanticRouteResult(
+                    candidate_key=prototype.candidate_key,
+                    candidate_class=prototype.candidate_class,
+                    description=prototype.description,
+                    score=score,
+                    threshold=float(threshold),
+                    above_threshold=score >= float(threshold),
+                    durable_candidate=prototype.durable_candidate,
+                    matched_example=example,
+                )
+
+    return best
+
+
+# ---------------------------------------------------------------------------
+# Fallback prototypes — used only when taxonomy.yaml cannot be loaded.
+# The canonical list lives in config/taxonomy.yaml.
+# ---------------------------------------------------------------------------
+
+_FALLBACK_PROTOTYPES: tuple[SemanticPrototype, ...] = (
     SemanticPrototype(
         candidate_key="identity.location",
         candidate_class="fact",
@@ -113,6 +213,71 @@ PROTOTYPES: tuple[SemanticPrototype, ...] = (
         ),
     ),
     SemanticPrototype(
+        candidate_key="identity.dietary",
+        candidate_class="fact",
+        description="A dietary restriction, food preference, or eating habit the user follows.",
+        durable_candidate=True,
+        examples=(
+            "I'm vegetarian.",
+            "I don't eat meat.",
+            "I'm vegan.",
+            "I don't eat gluten.",
+            "I'm lactose intolerant.",
+            "I keep kosher.",
+        ),
+    ),
+    SemanticPrototype(
+        candidate_key="identity.health",
+        candidate_class="fact",
+        description="A health condition, allergy, or medical fact about the user.",
+        durable_candidate=True,
+        examples=(
+            "I'm allergic to nuts.",
+            "I have asthma.",
+            "I have Type 2 diabetes.",
+            "I'm allergic to penicillin.",
+        ),
+    ),
+    SemanticPrototype(
+        candidate_key="preference.communication",
+        candidate_class="preference",
+        description="How the user prefers to receive information or be communicated with.",
+        durable_candidate=True,
+        examples=(
+            "I prefer short answers.",
+            "Please be concise.",
+            "I like bullet points.",
+            "Can you keep responses brief?",
+            "I prefer plain language over technical jargon.",
+        ),
+    ),
+    SemanticPrototype(
+        candidate_key="preference.schedule",
+        candidate_class="preference",
+        description="The user's preferred times, working patterns, or scheduling habits.",
+        durable_candidate=True,
+        examples=(
+            "I work best in the mornings.",
+            "I prefer evening meetings.",
+            "Fridays are my quiet days.",
+            "I usually work from home on Wednesdays.",
+            "Mornings are busy for me.",
+        ),
+    ),
+    SemanticPrototype(
+        candidate_key="identity.relationship",
+        candidate_class="fact",
+        description="A named relationship or family fact the user has shared.",
+        durable_candidate=True,
+        examples=(
+            "My partner's name is Sarah.",
+            "I have two kids.",
+            "My sister lives in Glasgow.",
+            "My son just started school.",
+            "I live with my partner.",
+        ),
+    ),
+    SemanticPrototype(
         candidate_key="contextual.world_fact",
         candidate_class="context",
         description="A useful external or local-world fact that is not necessarily about the user profile.",
@@ -137,42 +302,4 @@ PROTOTYPES: tuple[SemanticPrototype, ...] = (
     ),
 )
 
-
-def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
-    left_norm = float(np.linalg.norm(left))
-    right_norm = float(np.linalg.norm(right))
-    if left_norm == 0.0 or right_norm == 0.0:
-        return 0.0
-    return float(np.dot(left, right) / (left_norm * right_norm))
-
-
-def route_semantic_candidate(
-    text: str,
-    encoder: EmbeddingEncoder,
-    *,
-    threshold: float = 0.72,
-    prototypes: tuple[SemanticPrototype, ...] = PROTOTYPES,
-) -> SemanticRouteResult | None:
-    cleaned = (text or "").strip()
-    if not cleaned:
-        return None
-
-    query_vector = encoder.encode(cleaned)
-    best_result: SemanticRouteResult | None = None
-
-    for prototype in prototypes:
-        for example in prototype.examples:
-            score = _cosine_similarity(query_vector, encoder.encode(example))
-            if best_result is None or score > best_result.score:
-                best_result = SemanticRouteResult(
-                    candidate_key=prototype.candidate_key,
-                    candidate_class=prototype.candidate_class,
-                    description=prototype.description,
-                    score=score,
-                    threshold=float(threshold),
-                    above_threshold=score >= float(threshold),
-                    durable_candidate=prototype.durable_candidate,
-                    matched_example=example,
-                )
-
-    return best_result
+PROTOTYPES: tuple[SemanticPrototype, ...] = _load_prototypes()

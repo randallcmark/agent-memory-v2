@@ -32,6 +32,8 @@ src/agent_memory_v2/semantic_router.py
 src/agent_memory_v2/sentiment.py
 src/agent_memory_v2/state_cli.py
 src/agent_memory_v2/store.py
+src/agent_memory_v2/structured_extractor.py
+src/agent_memory_v2/taxonomy.py
 src/agent_memory_v2.egg-info/PKG-INFO
 src/agent_memory_v2.egg-info/SOURCES.txt
 src/agent_memory_v2.egg-info/dependency_links.txt

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
 import faiss
 import numpy as np
 
-from agent_memory_v2.models import MemoryRecord, RecallResult
+from agent_memory_v2.models import SCHEMA_VERSION, MemoryRecord, RecallResult
 
 
 class MemoryStore:
@@ -25,6 +26,22 @@ class MemoryStore:
             with self.metadata_path.open("r", encoding="utf-8") as handle:
                 raw = json.load(handle)
             self.records = [MemoryRecord(**item) for item in raw]
+            self._check_schema_versions()
+
+    def _check_schema_versions(self) -> None:
+        stale = [
+            r.memory_id
+            for r in self.records
+            if r.metadata.get("schema_version", 0) != SCHEMA_VERSION
+        ]
+        if stale:
+            warnings.warn(
+                f"{len(stale)} record(s) carry schema_version != {SCHEMA_VERSION} "
+                f"(e.g. {stale[0]!r}). Run 'agent-memory-v2-admin rebuild' to "
+                "rebuild metadata after upgrading.",
+                UserWarning,
+                stacklevel=3,
+            )
 
     def _save(self) -> None:
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -47,6 +64,14 @@ class MemoryStore:
         self.index = faiss.IndexFlatIP(self.embedding_dim)
         self.records = []
         self._save()
+
+    def update_record_metadata(self, memory_id: str, updates: dict) -> bool:
+        for record in self.records:
+            if record.memory_id == memory_id:
+                record.metadata.update(updates)
+                self._save()
+                return True
+        return False
 
     def search(
         self,

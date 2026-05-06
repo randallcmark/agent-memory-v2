@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: agent-memory-v2
 Version: 0.1.0
 Summary: Clean rebuild of a persistent memory layer for local Ollama-backed agents.
-Requires-Python: >=3.13
+Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: faiss-cpu
 Requires-Dist: numpy
@@ -50,48 +50,29 @@ local agents:
 
 ## Current Capabilities
 
-The current baseline supports:
-
-- local Ollama-backed chat
-- persistent memory across sessions
+- local Ollama-backed chat with persistent memory across sessions
 - multi-user profile segregation
-- rule-based memory classification
-- durable sidecar storage for facts and preferences
-- structured multi-source recall
-- derived user profile injection
-- temporal context injection
-- sentiment-aware response guidance
-- maintenance, rebuild, backup, restore, and inspection tooling
-- deterministic regression evaluation for core memory stages
+- rule-based memory classification with hybrid semantic/structured extraction fallback
+- durable sidecar storage for facts, preferences, and tasks
+- structured multi-source recall with class, durability, and recency ranking
+- per-user timezone and communication preference support
+- derived user profile injection into every prompt
+- temporal context and sentiment-aware response guidance
+- Ollama resilience: retry with exponential backoff, graceful degradation on failure
+- character-budget-gated prompt construction
+- maintenance, rebuild, backup, restore, and archive inspection tooling
+- schema versioning with load-time migration warnings
+- deterministic regression evaluation (no Ollama required)
 - live Ollama evaluation for real memory-use and sentiment-behavior checks
 - scenario-driven qualitative review with saved prompt/recall/response artifacts
-
-## Repo Structure
-
-- `src/agent_memory_v2/`: application code
-- `config/`: runtime configuration
-- `scripts/`: shell entrypoints
-- `tests/`: unit and integration coverage
-- `seeds/`: generic non-sensitive seed data
+- CI via GitHub Actions on every push and pull request to main
 
 ## Quick Start
 
-From the project root:
-
 ```bash
+pip install -e '.[dev]'
 make doctor
 make chat
-```
-
-Useful commands:
-
-```bash
-make chat
-make stats
-make list
-make list-sidecar
-make profile
-make doctor
 ```
 
 For named-user operation:
@@ -100,36 +81,42 @@ For named-user operation:
 make chat ARGS="--user mark"
 ```
 
-## Debug and Analysis
-
-The project also includes stage-by-stage tooling so you can inspect the pipeline
-independently:
+Useful inspection commands:
 
 ```bash
-make classify
-make recall
-make prompt
-make generate
-make ingest
-make scenario-run
-make scenario-show
-make scenario-compare
+make stats
+make list
+make list-sidecar
+make profile
 ```
 
-These tools are intended for qualitative analysis, debugging, and regression
-work rather than normal end-user operation.
+## Debug and Analysis
+
+Stage-by-stage tooling for inspecting the pipeline independently:
+
+```bash
+make classify ARGS="--text 'I am based in Edinburgh.' --extract"
+make recall ARGS="--text 'Where do I live?'"
+make prompt ARGS="--text 'Where do I live?'"
+make ingest ARGS="--text 'I prefer oat milk.' --reply 'Noted.'"
+make scenario-run
+make scenario-show
+```
+
+## Repo Structure
+
+- `src/agent_memory_v2/`: application source
+- `config/`: runtime configuration (`settings.yaml`, `taxonomy.yaml`)
+- `scripts/`: shell entrypoints
+- `tests/`: unit and integration tests
+- `evals/`: deterministic and live eval datasets
+- `seeds/`: generic non-sensitive seed data
 
 ## Documentation
 
-- `TOOLS.md`: operational and debug workflows
-- `STATUS.md`: current implementation state
+- `CLAUDE.md`: architecture and command reference for Claude Code sessions
+- `TOOLS.md`: operational and debug workflows with stage-by-stage traceability
+- `STATUS.md`: current implementation state and verified commands
 - `ROADMAP.md`: planned work and completed milestones
-- `SEMANTIC_EXTRACTION.md`: concrete design for the next hybrid durable-memory extraction upgrade
+- `INTERNAL_README.md`: detailed internal/operator notes
 - `PUBLISHING.md`: repo sanitisation and publication flow
-- `skills/`: project-contained Codex skills for operations and quality workflows
-- `INTERNAL_README.md`: detailed internal/operator notes preserved from active development
-
-## Status
-
-This project is under active development. The core local memory loop is working,
-and the current focus is improving quality, evaluation, and retrieval behavior.
