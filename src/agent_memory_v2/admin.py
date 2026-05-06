@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -62,6 +63,49 @@ def _classification_source_text(item: dict) -> str:
                 body = body.split(agent_marker, 1)[0]
             return body.strip()
     return text
+
+
+def _build_sidecar_record(record: MemoryRecord) -> MemoryRecord:
+    memory_class = record.metadata.get("memory_class", "fact")
+    extracted = record.metadata.get("extracted_value")
+    text = str(extracted or record.summary or record.text).strip()
+    return MemoryRecord(
+        memory_id=f"{record.memory_id}:sidecar",
+        role=memory_class,
+        text=text,
+        summary=record.summary,
+        timestamp=record.timestamp,
+        conversation_id=record.conversation_id,
+        turn_id=record.turn_id,
+        message_id=record.message_id,
+        metadata={
+            **record.metadata,
+            "kind": "sidecar_memory",
+            "source_memory_id": record.memory_id,
+        },
+    )
+
+
+def _normalize_embedding_text(text: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(text).lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _sidecar_vector_text(record: MemoryRecord) -> str:
+    value = record.text or record.summary or ""
+    memory_class = str(record.metadata.get("memory_class", record.role) or "").strip()
+    profile_key = str(record.metadata.get("profile_key") or "").strip()
+    parts: list[str] = [value]
+    key_parts = [part for part in re.split(r"[._]+", profile_key) if part]
+    tail_key = key_parts[-1] if key_parts else ""
+    if tail_key and tail_key != "general":
+        parts.append(tail_key)
+    if memory_class == "preference":
+        parts.append("prefer")
+    elif memory_class == "task":
+        parts.append("remind")
+    return _normalize_embedding_text(" ".join(parts))
 
 
 def _should_run_semantic_router(metadata: dict) -> bool:
@@ -328,6 +372,16 @@ def prune_sidecar_dry_run(config: AppConfig, *, limit: int | None = None) -> dic
 
 
 def prune_dry_run(config: AppConfig, *, limit: int | None = None) -> dict:
+    payload = _prune_decision_payload(config)
+    if limit is None:
+        limit = int((config.aging.get("prune", {}) or {}).get("dry_run_limit", 100))
+    return {
+        **payload,
+        "candidates": payload["candidates"][:limit],
+    }
+
+
+def _prune_decision_payload(config: AppConfig) -> dict:
     store = _build_store(config)
     now_dt = datetime.now(timezone.utc)
     base_decisions = [
@@ -358,13 +412,11 @@ def prune_dry_run(config: AppConfig, *, limit: int | None = None) -> dict:
             -(item["age_days"] or 0.0),
         ),
     )
-    if limit is None:
-        limit = int((config.aging.get("prune", {}) or {}).get("dry_run_limit", 100))
     return {
         "count": len(decisions),
         "summary": summary,
         "reason_counts": reason_counts,
-        "candidates": sorted_decisions[:limit],
+        "candidates": sorted_decisions,
         "policy": config.aging.get("prune", {}),
     }
 
@@ -413,7 +465,7 @@ def prune_sidecar_store(config: AppConfig) -> dict:
     )
     sidecar_store.reset()
     for record in kept_records:
-        sidecar_store.add(record, encoder.encode(record.summary or record.text))
+        sidecar_store.add(record, encoder.encode(_sidecar_vector_text(record)))
     if profile_store is not None:
         profile_store.rebuild_from_records(sidecar_store.records)
 
@@ -428,7 +480,7 @@ def prune_sidecar_store(config: AppConfig) -> dict:
 
 def prune_store(config: AppConfig) -> dict:
     store = _build_store(config)
-    decisions = prune_dry_run(config, limit=None)
+    decisions = _prune_decision_payload(config)
     prune_ids = {
         item["memory_id"]
         for item in decisions["candidates"]
@@ -652,22 +704,11 @@ def rebuild_store(config: AppConfig) -> dict:
                 if sidecar_store is not None:
                     allowed = set(config.sidecar.get("store_classes", ["preference", "fact"]))
                     if record.metadata.get("durable", False) and record.metadata.get("memory_class") in allowed:
-                        sidecar_record = MemoryRecord(
-                            memory_id=f"{record.memory_id}:sidecar",
-                            role=record.metadata.get("memory_class", "fact"),
-                            text=str(record.metadata.get("extracted_value") or record.summary or record.text),
-                            summary=record.summary,
-                            timestamp=record.timestamp,
-                            conversation_id=record.conversation_id,
-                            turn_id=record.turn_id,
-                            message_id=record.message_id,
-                            metadata={
-                                **record.metadata,
-                                "kind": "sidecar_memory",
-                                "source_memory_id": record.memory_id,
-                            },
+                        sidecar_record = _build_sidecar_record(record)
+                        sidecar_store.add(
+                            sidecar_record,
+                            encoder.encode(_sidecar_vector_text(sidecar_record)),
                         )
-                        sidecar_store.add(sidecar_record, vector)
                         sidecar_rebuilt += 1
                 rebuilt += 1
     if profile_store is not None and sidecar_store is not None:
