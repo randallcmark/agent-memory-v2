@@ -698,6 +698,150 @@ def rebuild_profile(config: AppConfig) -> dict:
     }
 
 
+def _read_archive_records(archive_path: Path) -> list[dict]:
+    if not archive_path.exists():
+        return []
+    records: list[dict] = []
+    with archive_path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if stripped:
+                try:
+                    records.append(json.loads(stripped))
+                except json.JSONDecodeError:
+                    pass
+    return records
+
+
+def inspect_archive(config: AppConfig) -> dict:
+    prune_cfg = config.aging.get("prune", {}) or {}
+    main_path = config.resolve_path(
+        str(prune_cfg.get("archive_path", "data/archive/pruned_memories.jsonl"))
+    )
+    sidecar_cfg = config.aging.get("sidecar", {}) or {}
+    sidecar_path = config.resolve_path(
+        str(sidecar_cfg.get("archive_path", "data/archive/pruned_sidecar.jsonl"))
+    )
+
+    def _summarise(records: list[dict]) -> dict:
+        if not records:
+            return {"count": 0}
+        class_counts: dict[str, int] = {}
+        key_counts: dict[str, int] = {}
+        timestamps = []
+        for r in records:
+            mc = (r.get("metadata") or {}).get("memory_class", r.get("role", "unknown"))
+            class_counts[mc] = class_counts.get(mc, 0) + 1
+            pk = (r.get("metadata") or {}).get("profile_key")
+            if pk:
+                key_counts[pk] = key_counts.get(pk, 0) + 1
+            ts = r.get("timestamp")
+            if ts:
+                timestamps.append(ts)
+        timestamps.sort()
+        return {
+            "count": len(records),
+            "memory_class_breakdown": class_counts,
+            "top_profile_keys": dict(sorted(key_counts.items(), key=lambda kv: -kv[1])[:10]),
+            "oldest": timestamps[0] if timestamps else None,
+            "newest": timestamps[-1] if timestamps else None,
+        }
+
+    return {
+        "main_archive": {"path": str(main_path), **_summarise(_read_archive_records(main_path))},
+        "sidecar_archive": {"path": str(sidecar_path), **_summarise(_read_archive_records(sidecar_path))},
+    }
+
+
+def restore_from_archive(
+    config: AppConfig,
+    *,
+    memory_id: str | None = None,
+    since: str | None = None,
+    memory_class: str | None = None,
+    sidecar: bool = False,
+) -> dict:
+    from agent_memory_v2.embeddings import build_encoder
+    from agent_memory_v2.models import MemoryRecord
+
+    prune_cfg = config.aging.get("prune", {}) or {}
+    sidecar_cfg = config.aging.get("sidecar", {}) or {}
+    if sidecar:
+        archive_path = config.resolve_path(
+            str(sidecar_cfg.get("archive_path", "data/archive/pruned_sidecar.jsonl"))
+        )
+        store = _build_sidecar_store(config)
+    else:
+        archive_path = config.resolve_path(
+            str(prune_cfg.get("archive_path", "data/archive/pruned_memories.jsonl"))
+        )
+        store = _build_store(config)
+
+    if store is None:
+        return {"error": "store not available", "restored": 0, "skipped_duplicate": 0, "skipped_filter": 0}
+
+    encoder = build_encoder(
+        provider=config.embeddings.get("provider", "hash"),
+        model_name=config.embeddings.get("model", ""),
+        dimensions=config.embedding_dim,
+        host=config.embeddings.get("host") or config.llm.get("host"),
+        timeout_seconds=int(
+            config.embeddings.get("timeout_seconds", config.llm.get("timeout_seconds", 60))
+        ),
+    )
+
+    since_dt = None
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        except ValueError:
+            return {"error": f"Invalid --since date: {since}", "restored": 0, "skipped_duplicate": 0, "skipped_filter": 0}
+
+    existing_ids = {r.memory_id for r in store.records}
+    raw_records = _read_archive_records(archive_path)
+
+    restored = 0
+    skipped_dup = 0
+    skipped_filter = 0
+
+    for raw in raw_records:
+        record = MemoryRecord(**raw)
+
+        if memory_id and record.memory_id != memory_id:
+            skipped_filter += 1
+            continue
+        if memory_class and (raw.get("metadata") or {}).get("memory_class", record.role) != memory_class:
+            skipped_filter += 1
+            continue
+        if since_dt:
+            ts = record.timestamp
+            try:
+                ts_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                if ts_dt < since_dt:
+                    skipped_filter += 1
+                    continue
+            except (ValueError, AttributeError):
+                skipped_filter += 1
+                continue
+
+        if record.memory_id in existing_ids:
+            skipped_dup += 1
+            continue
+
+        embed_text = record.summary or record.text
+        vector = encoder.encode(embed_text)
+        store.add(record, vector)
+        existing_ids.add(record.memory_id)
+        restored += 1
+
+    return {
+        "restored": restored,
+        "skipped_duplicate": skipped_dup,
+        "skipped_filter": skipped_filter,
+        "archive_path": str(archive_path),
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Admin tooling for agent_memory_v2.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -739,6 +883,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     rebuild_profile_cmd = subparsers.add_parser("rebuild-profile")
     rebuild_profile_cmd.add_argument("--force", action="store_true")
+
+    inspect_archive_cmd = subparsers.add_parser("inspect-archive")
+    inspect_archive_cmd.add_argument("--json", action="store_true")
+
+    restore_cmd = subparsers.add_parser("restore-from-archive")
+    restore_cmd.add_argument("--memory-id")
+    restore_cmd.add_argument("--since")
+    restore_cmd.add_argument("--memory-class")
+    restore_cmd.add_argument("--sidecar", action="store_true")
+    restore_cmd.add_argument("--force", action="store_true")
+    restore_cmd.add_argument("--json", action="store_true")
+
+    check_schema_cmd = subparsers.add_parser("check-schema")
+    check_schema_cmd.add_argument("--json", action="store_true")
 
     return parser
 
@@ -809,6 +967,38 @@ def main() -> int:
             return 2
         print(json.dumps(rebuild_profile(config), indent=2))
         return 0
+
+    if args.command == "inspect-archive":
+        print(json.dumps(inspect_archive(config), indent=2))
+        return 0
+
+    if args.command == "restore-from-archive":
+        if not args.force:
+            print("Refusing to restore without --force")
+            return 2
+        result = restore_from_archive(
+            config,
+            memory_id=args.memory_id,
+            since=args.since,
+            memory_class=args.memory_class,
+            sidecar=args.sidecar,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if "error" not in result else 1
+
+    if args.command == "check-schema":
+        import warnings
+        from agent_memory_v2.models import SCHEMA_VERSION
+        store = _build_store(config)
+        stale = [r.memory_id for r in store.records if r.metadata.get("schema_version", 0) != SCHEMA_VERSION]
+        payload = {
+            "current_schema_version": SCHEMA_VERSION,
+            "total_records": len(store.records),
+            "stale_records": len(stale),
+            "stale_ids": stale[:20],
+        }
+        print(json.dumps(payload, indent=2))
+        return 1 if stale else 0
 
     parser.error(f"Unknown command: {args.command}")
     return 2

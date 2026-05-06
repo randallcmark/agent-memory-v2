@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+SCHEMA_VERSION: int = 1
+
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()

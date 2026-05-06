@@ -187,6 +187,22 @@ keys:
 
   # ── preference domain ─────────────────────────────────────────────────────
 
+  - key: preference.timezone
+    tier1: preference
+    tier2: timezone
+    mode: scalar
+    class: preference
+    durable: true
+    description: "The user's stated timezone or time offset."
+    examples:
+      - "I'm in the Eastern timezone."
+      - "I'm in New York time."
+      - "My timezone is UTC+5:30."
+      - "I'm based in Tokyo time."
+      - "I'm on Pacific Standard Time."
+    rule_patterns: []
+    aliases: []
+
   - key: preference.general
     tier1: preference
     tier2: general

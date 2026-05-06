@@ -10,12 +10,14 @@ from agent_memory_v2.embeddings import HashEmbeddingEncoder
 from agent_memory_v2.models import Message
 from agent_memory_v2.pipeline import (
     MemoryPipeline,
+    _apply_char_budget,
     _build_temporal_context,
     _clean_memory_text,
     _format_recalled_item,
     _parse_timestamp,
     _recency_bonus,
     _relative_time_label,
+    _resolve_timezone,
     run_ollama_preflight,
 )
 
@@ -1300,3 +1302,118 @@ def test_ingest_turn_embeds_full_turn_text_in_main_store(tmp_path: Path):
     assert any("Agent:" in t for t in enc.encoded_texts)
     # The user summary alone must also appear (for the sidecar vector)
     assert any(t == "I prefer oat milk." for t in enc.encoded_texts)
+
+
+# ---------------------------------------------------------------------------
+# _apply_char_budget
+# ---------------------------------------------------------------------------
+
+
+def _item(text: str) -> dict:
+    return {"text": text, "role": "fact", "score": 0.9}
+
+
+def test_apply_char_budget_within_budget_unchanged():
+    factual = [_item("hello")]
+    contextual = [_item("world")]
+    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=200)
+    assert out_f == factual
+    assert out_c == contextual
+    assert applied is False
+
+
+def test_apply_char_budget_drops_contextual_when_exceeded():
+    factual = [_item("A" * 100)]
+    contextual = [_item("B" * 100)]
+    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=150)
+    assert len(out_f) == 1
+    assert out_c == []
+    assert applied is True
+
+
+def test_apply_char_budget_drops_factual_when_first_item_exceeds():
+    factual = [_item("A" * 200), _item("B" * 10)]
+    contextual = [_item("C" * 10)]
+    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=150)
+    assert len(out_f) == 1
+    assert out_f[0]["text"] == "A" * 200
+    assert out_c == []
+    assert applied is True
+
+
+def test_apply_char_budget_zero_disables():
+    factual = [_item("A" * 5000)]
+    out_f, out_c, applied = _apply_char_budget(factual, [], budget=0)
+    assert out_f == factual
+    assert applied is False
+
+
+# ── W7: timezone from profile ─────────────────────────────────────────────────
+
+def test_resolve_timezone_falls_back_to_config(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["app"] = {"timezone": "Europe/London"}
+    tz = _resolve_timezone(config, profile=None)
+    assert str(tz) == "Europe/London"
+
+
+def test_resolve_timezone_prefers_profile_over_config(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["app"] = {"timezone": "Europe/London"}
+    profile = {"preferences": {"preference.timezone": {"value": "America/New_York"}}}
+    tz = _resolve_timezone(config, profile=profile)
+    assert str(tz) == "America/New_York"
+
+
+def test_resolve_timezone_falls_back_when_profile_tz_invalid(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["app"] = {"timezone": "Europe/London"}
+    profile = {"preferences": {"preference.timezone": {"value": "Not/ATimezone"}}}
+    tz = _resolve_timezone(config, profile=profile)
+    assert str(tz) == "Europe/London"
+
+
+# ── W2: Ollama graceful degradation ──────────────────────────────────────────
+
+class FailingOllama:
+    def generate(self, prompt: str) -> str:
+        import requests
+        raise requests.ConnectionError("Ollama is down")
+
+    def embed(self, text: str) -> list[float]:
+        import requests
+        raise requests.ConnectionError("Ollama is down")
+
+
+def test_respond_returns_fallback_on_ollama_failure(tmp_path: Path):
+    pipeline = MemoryPipeline(
+        make_config(tmp_path),
+        encoder=StubEncoder(),
+        ollama=FailingOllama(),
+    )
+    pipeline.ingest(Message(role="user", text="hello"))
+    result = pipeline.respond(Message(role="user", text="hello again"))
+    assert "unable to respond" in result.lower() or result != ""
+
+
+def test_structured_extraction_metadata_returns_empty_on_ollama_failure(tmp_path: Path):
+    from agent_memory_v2.semantic_router import SemanticRouteResult
+    config = make_config(tmp_path)
+    config.raw.setdefault("structured_extractor", {})["enabled"] = True
+    pipeline = MemoryPipeline(
+        config,
+        encoder=StubEncoder(),
+        ollama=FailingOllama(),
+    )
+    route = SemanticRouteResult(
+        candidate_key="identity.location",
+        candidate_class="fact",
+        description="Where the user lives.",
+        score=0.9,
+        threshold=0.72,
+        above_threshold=True,
+        durable_candidate=True,
+        matched_example="I live in Edinburgh.",
+    )
+    result = pipeline._structured_extraction_metadata("I live in Edinburgh.", route)
+    assert result == {}

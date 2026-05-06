@@ -1,5 +1,9 @@
+import json
+import tempfile
+from pathlib import Path
+
 from agent_memory_v2.models import MemoryRecord
-from agent_memory_v2.profile import build_profile
+from agent_memory_v2.profile import UserProfileStore, build_profile
 
 
 def make_record(*, memory_id: str, role: str, value: str, profile_key: str, timestamp: str):
@@ -124,3 +128,57 @@ def test_scalar_key_has_no_all_values():
     entry = profile["facts"]["identity.name"]
     assert entry["value"] == "Mark"
     assert "all_values" not in entry
+
+
+# ---------------------------------------------------------------------------
+# update_from_record (incremental hot path)
+# ---------------------------------------------------------------------------
+
+
+def _store_with_profile(records):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "profile.json"
+        store = UserProfileStore(path)
+        # seed the profile via full rebuild
+        store.rebuild_from_records(records)
+        return store, path
+
+
+def test_update_from_record_adds_new_scalar_fact():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = UserProfileStore(Path(tmp) / "p.json")
+        r = make_record(memory_id="u1", role="fact", value="Mark", profile_key="identity.name", timestamp="2026-04-01T09:00:00+00:00")
+        store.update_from_record(r)
+        profile = store.load()
+        assert profile["facts"]["identity.name"]["value"] == "Mark"
+
+
+def test_update_from_record_overwrites_scalar():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = UserProfileStore(Path(tmp) / "p.json")
+        r1 = make_record(memory_id="u1", role="fact", value="London", profile_key="identity.location", timestamp="2026-04-01T09:00:00+00:00")
+        r2 = make_record(memory_id="u2", role="fact", value="Bristol", profile_key="identity.location", timestamp="2026-04-01T10:00:00+00:00")
+        store.update_from_record(r1)
+        store.update_from_record(r2)
+        assert store.load()["facts"]["identity.location"]["value"] == "Bristol"
+
+
+def test_update_from_record_accumulates_additive_fact():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = UserProfileStore(Path(tmp) / "p.json")
+        r1 = make_record(memory_id="a1", role="fact", value="nuts", profile_key="identity.allergy", timestamp="2026-04-01T09:00:00+00:00")
+        r2 = make_record(memory_id="a2", role="fact", value="penicillin", profile_key="identity.allergy", timestamp="2026-04-01T10:00:00+00:00")
+        store.update_from_record(r1)
+        store.update_from_record(r2)
+        entry = store.load()["facts"]["identity.allergy"]
+        assert "nuts" in entry["all_values"]
+        assert "penicillin" in entry["all_values"]
+
+
+def test_update_from_record_skips_record_without_profile_key():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = UserProfileStore(Path(tmp) / "p.json")
+        r = make_record(memory_id="n1", role="fact", value="hello", profile_key="", timestamp="2026-04-01T09:00:00+00:00")
+        # should not raise
+        store.update_from_record(r)
+        assert store.load()["facts"] == {}
