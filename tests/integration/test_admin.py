@@ -504,6 +504,57 @@ def test_prune_store_removes_stale_ephemeral_turns(tmp_path: Path, monkeypatch):
     assert items[0]["memory_class"] == "preference"
 
 
+def test_prune_store_is_not_capped_by_dry_run_limit(tmp_path: Path, monkeypatch):
+    config = make_config(tmp_path)
+    config.raw["aging"] = {
+        "enabled": True,
+        "decay": {
+            "ephemeral_start_days": 1,
+            "ephemeral_full_days": 14,
+            "ephemeral_max_penalty": 0.08,
+            "task_start_days": 30,
+            "task_full_days": 90,
+            "task_max_penalty": 0.03,
+            "durable_start_days": 180,
+            "durable_full_days": 365,
+            "durable_max_penalty": 0.01,
+        },
+        "prune": {
+            "ephemeral_turn_ttl_days": 14,
+            "task_ttl_days": 90,
+            "dry_run_limit": 2,
+            "archive_path": "data/archive/pruned.jsonl",
+        },
+    }
+    pipeline = MemoryPipeline(config, encoder=StubEncoder(), ollama=StubOllama())
+    for index in range(4):
+        pipeline.ingest_turn(
+            Message(
+                role="user",
+                text=f"hello {index}",
+                turn_id=f"old-turn-{index}",
+                timestamp="2026-03-01T08:00:00+00:00",
+            ),
+            Message(
+                role="agent",
+                text="hi",
+                turn_id=f"old-turn-{index}",
+                timestamp="2026-03-01T08:00:01+00:00",
+            ),
+        )
+
+    dry_run = prune_dry_run(config)
+    monkeypatch.setattr("agent_memory_v2.admin.build_encoder", lambda **kwargs: StubEncoder())
+    result = prune_store(config)
+    items = list_memories(config, limit=10)
+
+    assert dry_run["count"] == 4
+    assert len(dry_run["candidates"]) == 2
+    assert result["pruned"] == 4
+    assert result["kept"] == 0
+    assert items == []
+
+
 def test_sidecar_prune_keeps_latest_profile_key_value(tmp_path: Path, monkeypatch):
     config = make_config(tmp_path)
     config.raw["sidecar"] = {
@@ -542,3 +593,55 @@ def test_sidecar_prune_keeps_latest_profile_key_value(tmp_path: Path, monkeypatc
     assert len(sidecar_items) == 1
     assert sidecar_items[0]["text"] == "coffee"
     assert profile["preferences"]["preference.general"]["value"] == "coffee"
+
+
+def test_rebuild_store_uses_canonical_sidecar_embedding_for_recall(tmp_path: Path, monkeypatch):
+    class CanonicalSidecarEncoder:
+        def encode(self, text: str) -> np.ndarray:
+            lowered = text.lower()
+            if "edinburgh" in lowered:
+                return np.array([1.0, 0.0, 0.0], dtype="float32")
+            return np.array([0.0, 1.0, 0.0], dtype="float32")
+
+    config = make_config(tmp_path)
+    config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}
+    config.raw["structured_extractor"] = {
+        "enabled": True,
+        "admission_threshold": 0.75,
+        "max_value_chars": 160,
+        "allowed_profile_keys": ["identity.location"],
+    }
+    config.raw["sidecar"] = {
+        "enabled": True,
+        "top_k": 2,
+        "similarity_threshold": 0.2,
+        "index_path": "data/sidecar/test.index",
+        "metadata_path": "data/sidecar/test.json",
+        "store_classes": ["preference", "fact", "task"],
+    }
+    interaction_log = config.resolve_path(config.memory["interaction_log_path"])
+    interaction_log.parent.mkdir(parents=True, exist_ok=True)
+    interaction_log.write_text(
+        '{"role":"turn","text":"User: I am based in the UK.\\nAgent: noted",'
+        '"summary":"I am based in the UK.",'
+        '"timestamp":"2026-03-29T09:00:00+00:00","message_id":"m1",'
+        '"turn_id":"t1","conversation_id":"default",'
+        '"metadata":{"kind":"turn_memory","memory_class":"turn"}}\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("agent_memory_v2.admin.build_encoder", lambda **kwargs: CanonicalSidecarEncoder())
+    monkeypatch.setattr("agent_memory_v2.admin.OllamaClient", StubExtractorClient)
+
+    rebuild_store(config)
+
+    pipeline = MemoryPipeline(
+        config,
+        encoder=CanonicalSidecarEncoder(),
+        ollama=StubOllama(),
+    )
+    recalled = pipeline.recall(Message(role="user", text="Edinburgh in the UK", message_id="new-id"))
+
+    assert recalled[0]["store_kind"] == "sidecar_memory"
+    assert recalled[0]["text"] == "Edinburgh in the UK"
+    assert recalled[0]["memory_class"] == "fact"

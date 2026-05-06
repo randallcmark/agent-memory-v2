@@ -686,6 +686,54 @@ def test_recall_prefers_sidecar_record_for_durable_fact(tmp_path: Path):
     assert recalled[0]["source_message_id"] == recalled[0]["message_id"]
 
 
+def test_sidecar_embeddings_use_canonical_durable_value_on_ingest(tmp_path: Path):
+    class CanonicalSidecarEncoder:
+        def encode(self, text: str) -> np.ndarray:
+            lowered = text.lower()
+            if "edinburgh" in lowered:
+                return np.array([1.0, 0.0, 0.0], dtype="float32")
+            return np.array([0.0, 1.0, 0.0], dtype="float32")
+
+    config = make_config(tmp_path)
+    config.raw["sidecar"] = {
+        "enabled": True,
+        "top_k": 2,
+        "similarity_threshold": 0.2,
+        "index_path": "data/sidecar/test.index",
+        "metadata_path": "data/sidecar/test.json",
+        "store_classes": ["preference", "fact", "task"],
+    }
+    config.raw["structured_extractor"] = {
+        "enabled": True,
+        "admission_threshold": 0.75,
+        "max_value_chars": 160,
+        "allowed_profile_keys": ["identity.location"],
+    }
+    config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}
+    pipeline = MemoryPipeline(
+        config,
+        encoder=CanonicalSidecarEncoder(),
+        ollama=StubExtractionOllama(
+            '{"memory_class":"fact","durable":true,"profile_key":"identity.location",'
+            '"extracted_value":"Edinburgh","confidence":0.86,'
+            '"supersedes_profile_key":"identity.location"}'
+        ),
+    )
+
+    pipeline.ingest_turn(
+        Message(role="user", text="I am based in the UK.", turn_id="semantic-turn"),
+        Message(role="agent", text="Noted.", turn_id="semantic-turn"),
+    )
+
+    recalled = pipeline.recall(
+        Message(role="user", text="Edinburgh", message_id="new-id")
+    )
+
+    assert recalled[0]["store_kind"] == "sidecar_memory"
+    assert recalled[0]["text"] == "Edinburgh"
+    assert recalled[0]["memory_class"] == "fact"
+
+
 def test_semantic_candidate_metadata_is_stored_without_sidecar_promotion(tmp_path: Path):
     config = make_config(tmp_path)
     config.raw["embeddings"] = {"provider": "hash", "model": "hash", "dimensions": 128}

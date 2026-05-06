@@ -86,6 +86,10 @@ def _build_sidecar_record(record: MemoryRecord) -> MemoryRecord:
     )
 
 
+def _sidecar_vector_text(record: MemoryRecord) -> str:
+    return record.text or record.summary or ""
+
+
 def _clean_memory_text(text: str) -> str:
     cleaned = (text or "").strip()
     cleaned = re.sub(r"Agent:\s*Your response:\s*", "Agent: ", cleaned, flags=re.IGNORECASE)
@@ -482,7 +486,9 @@ class MemoryPipeline:
         )
         self.store.add(record, vector)
         if self.sidecar_store is not None and _should_store_in_sidecar(self.config, metadata):
-            self.sidecar_store.add(_build_sidecar_record(record), vector)
+            sidecar_record = _build_sidecar_record(record)
+            sidecar_vector = self.encoder.encode(_sidecar_vector_text(sidecar_record))
+            self.sidecar_store.add(sidecar_record, sidecar_vector)
             if self.profile_store is not None:
                 self.profile_store.rebuild_from_records(self.sidecar_store.records)
         self._append_log(
