@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -85,8 +86,26 @@ def _build_sidecar_record(record: MemoryRecord) -> MemoryRecord:
     )
 
 
+def _normalize_embedding_text(text: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(text).lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
 def _sidecar_vector_text(record: MemoryRecord) -> str:
-    return record.text or record.summary or ""
+    value = record.text or record.summary or ""
+    memory_class = str(record.metadata.get("memory_class", record.role) or "").strip()
+    profile_key = str(record.metadata.get("profile_key") or "").strip()
+    parts: list[str] = [value]
+    key_parts = [part for part in re.split(r"[._]+", profile_key) if part]
+    tail_key = key_parts[-1] if key_parts else ""
+    if tail_key and tail_key != "general":
+        parts.append(tail_key)
+    if memory_class == "preference":
+        parts.append("prefer")
+    elif memory_class == "task":
+        parts.append("remind")
+    return _normalize_embedding_text(" ".join(parts))
 
 
 def _should_run_semantic_router(metadata: dict) -> bool:

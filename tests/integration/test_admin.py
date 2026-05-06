@@ -601,7 +601,9 @@ def test_rebuild_store_uses_canonical_sidecar_embedding_for_recall(tmp_path: Pat
             lowered = text.lower()
             if "edinburgh" in lowered:
                 return np.array([1.0, 0.0, 0.0], dtype="float32")
-            return np.array([0.0, 1.0, 0.0], dtype="float32")
+            if "based" in lowered or "live" in lowered or "home" in lowered:
+                return np.array([0.0, 1.0, 0.0], dtype="float32")
+            return np.array([0.0, 0.0, 1.0], dtype="float32")
 
     config = make_config(tmp_path)
     config.raw["semantic_router"] = {"enabled": True, "threshold": 0.72, "debug_metadata": True}

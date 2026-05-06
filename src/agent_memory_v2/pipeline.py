@@ -86,8 +86,26 @@ def _build_sidecar_record(record: MemoryRecord) -> MemoryRecord:
     )
 
 
+def _normalize_embedding_text(text: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(text).lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
 def _sidecar_vector_text(record: MemoryRecord) -> str:
-    return record.text or record.summary or ""
+    value = record.text or record.summary or ""
+    memory_class = str(record.metadata.get("memory_class", record.role) or "").strip()
+    profile_key = str(record.metadata.get("profile_key") or "").strip()
+    parts: list[str] = [value]
+    key_parts = [part for part in re.split(r"[._]+", profile_key) if part]
+    tail_key = key_parts[-1] if key_parts else ""
+    if tail_key and tail_key != "general":
+        parts.append(tail_key)
+    if memory_class == "preference":
+        parts.append("prefer")
+    elif memory_class == "task":
+        parts.append("remind")
+    return _normalize_embedding_text(" ".join(parts))
 
 
 def _clean_memory_text(text: str) -> str:
@@ -292,6 +310,14 @@ def _contextual_prompt_filter(items: list[dict], *, allow_empty: bool = False) -
     if allow_empty:
         return [], dropped
     return items, []
+
+
+def _should_replace_recalled_item(existing: dict, candidate: dict) -> bool:
+    existing_kind = str(existing.get("store_kind", ""))
+    candidate_kind = str(candidate.get("store_kind", ""))
+    if candidate_kind == "sidecar_memory" and existing_kind != "sidecar_memory":
+        return True
+    return False
 
 
 def _build_temporal_context(config: AppConfig, profile: dict | None = None) -> str:
@@ -565,6 +591,7 @@ class MemoryPipeline:
         return record
 
     def recall(self, message: Message) -> list[dict]:
+        query_route = self._query_intent_route(message.text)
         vector = self.encoder.encode(message.text)
         results = self.store.search(
             vector,
@@ -573,33 +600,39 @@ class MemoryPipeline:
             exclude_message_id=message.message_id,
         )
         if self.sidecar_store is not None:
-            results.extend(
-                self.sidecar_store.search(
-                    vector,
-                    top_k=int(self.config.sidecar.get("top_k", self.config.memory["top_k"])),
-                    similarity_threshold=float(
-                        self.config.sidecar.get(
-                            "similarity_threshold", self.config.memory["similarity_threshold"]
-                        )
-                    ),
-                    exclude_message_id=message.message_id,
+            for query_text in self._sidecar_query_texts(message.text, query_route):
+                results.extend(
+                    self.sidecar_store.search(
+                        self.encoder.encode(query_text),
+                        top_k=int(self.config.sidecar.get("top_k", self.config.memory["top_k"])),
+                        similarity_threshold=float(
+                            self.config.sidecar.get(
+                                "similarity_threshold", self.config.memory["similarity_threshold"]
+                            )
+                        ),
+                        exclude_message_id=message.message_id,
+                    )
                 )
-            )
-        query_route = self._query_intent_route(message.text)
         ranked = sorted(results, key=lambda item: self._rank_key(item, query_route), reverse=True)
         deduped: list[dict] = []
         recalled_items: list[RecallResult] = []
+        seen_positions: dict[str, int] = {}
         seen_sources: set[str] = set()
         for item in ranked:
             payload = self._recall_payload(item)
             source_id = payload["source_message_id"]
             if source_id in seen_sources:
+                position = seen_positions[source_id]
+                if _should_replace_recalled_item(deduped[position], payload):
+                    deduped[position] = payload
+                    recalled_items[position] = item
                 continue
+            if len(deduped) >= int(self.config.memory["top_k"]):
+                break
+            seen_positions[source_id] = len(deduped)
             seen_sources.add(source_id)
             deduped.append(payload)
             recalled_items.append(item)
-            if len(deduped) >= int(self.config.memory["top_k"]):
-                break
         self._track_recall(recalled_items)
         return deduped
 
@@ -635,6 +668,29 @@ class MemoryPipeline:
         if record_profile_key and record_profile_key == query_route.candidate_key:
             return 0.04
         return 0.0
+
+    def _sidecar_query_texts(
+        self, text: str, query_route: SemanticRouteResult | None
+    ) -> list[str]:
+        texts: list[str] = []
+        raw = str(text or "").strip()
+        normalized = _normalize_embedding_text(raw)
+        if raw:
+            texts.append(raw)
+        if normalized and normalized != raw:
+            texts.append(normalized)
+        if query_route is not None and query_route.durable_candidate:
+            matched_example = _normalize_embedding_text(str(query_route.matched_example or ""))
+            if matched_example:
+                texts.append(matched_example)
+        unique: list[str] = []
+        seen: set[str] = set()
+        for item in texts:
+            if item in seen:
+                continue
+            seen.add(item)
+            unique.append(item)
+        return unique
 
     def _rank_key(self, item, query_route: SemanticRouteResult | None = None) -> tuple[float, float]:
         rank_score = (

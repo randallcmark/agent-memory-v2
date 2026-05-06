@@ -692,9 +692,11 @@ def test_sidecar_embeddings_use_canonical_durable_value_on_ingest(tmp_path: Path
     class CanonicalSidecarEncoder:
         def encode(self, text: str) -> np.ndarray:
             lowered = text.lower()
-            if "edinburgh" in lowered:
+            if lowered.strip() == "edinburgh":
                 return np.array([1.0, 0.0, 0.0], dtype="float32")
-            return np.array([0.0, 1.0, 0.0], dtype="float32")
+            if "based" in lowered or "live" in lowered or "home" in lowered:
+                return np.array([0.0, 1.0, 0.0], dtype="float32")
+            return np.array([0.0, 0.0, 1.0], dtype="float32")
 
     config = make_config(tmp_path)
     config.raw["sidecar"] = {
@@ -1349,7 +1351,7 @@ def test_ingest_turn_embeds_full_turn_text_in_main_store(tmp_path: Path):
     # in encoded texts (for the main store vector)
     assert any("Agent:" in t for t in enc.encoded_texts)
     # The user summary alone must also appear (for the sidecar vector)
-    assert any(t == "I prefer oat milk." for t in enc.encoded_texts)
+    assert any("oat milk" in t for t in enc.encoded_texts)
 
 
 # ---------------------------------------------------------------------------
