@@ -23,7 +23,7 @@ _PREFERENCE_PATTERNS = [
     re.compile(r"\bmy favourite\s+(?P<subject>\w+)\s+is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
 ]
 
-_FACT_PATTERNS: list[tuple[re.Pattern, str]] = [
+_FALLBACK_FACT_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bI'm from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.origin"),
     (re.compile(r"\bI am from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.origin"),
     (re.compile(r"\bmy name is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.name"),
@@ -34,6 +34,20 @@ _FACT_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bI am allergic to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.allergy"),
     (re.compile(r"\bremember that I am\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.general"),
 ]
+
+
+def _load_fact_patterns() -> list[tuple[re.Pattern, str]]:
+    try:
+        from agent_memory_v2.taxonomy import get_taxonomy
+        patterns = get_taxonomy().to_fact_patterns()
+        if patterns:
+            return patterns
+    except Exception:
+        pass
+    return _FALLBACK_FACT_PATTERNS
+
+
+_FACT_PATTERNS: list[tuple[re.Pattern, str]] = _load_fact_patterns()
 
 _TASK_PATTERNS = [
     re.compile(r"\bdon't let me forget to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
