@@ -1,4 +1,4 @@
-.PHONY: test check-schema smoke smoke-generate embedding-smoke install-embedding-model use-ollama-embeddings use-hash-embeddings e2e chat preflight stats list list-sidecar profile aging-report prune-dry-run prune maintain maintenance-status rebuild-profile reset rebuild doctor classify recall prompt generate ingest backup restore seed sanitize-publish eval-classification eval-semantic eval-sentiment eval-profile eval-recall eval-prompt eval-all eval-history eval-compare live-eval-memory live-eval-sentiment live-eval-all live-eval-history live-eval-compare scenario-list scenario-run scenario-show scenario-compare
+.PHONY: test check-schema smoke smoke-generate embedding-smoke install-embedding-model use-ollama-embeddings use-hash-embeddings e2e chat preflight stats list list-sidecar profile aging-report prune-dry-run prune maintain maintenance-status rebuild-profile reset rebuild doctor classify recall prompt generate ingest backup restore seed sanitize-publish eval-classification eval-semantic eval-sentiment eval-profile eval-recall eval-prompt eval-all eval-history eval-compare live-eval-memory live-eval-sentiment live-eval-all live-eval-history live-eval-compare scenario-list scenario-run scenario-show scenario-compare agent-eval-run agent-eval-all agent-eval-history agent-eval-compare
 
 test:
 	bash scripts/test.sh
@@ -152,3 +152,15 @@ scenario-show:
 
 scenario-compare:
 	bash scripts/scenario.sh compare $(ARGS)
+
+agent-eval-run:
+	bash scripts/agent-eval.sh run $(ARGS)
+
+agent-eval-all:
+	bash scripts/agent-eval.sh run-all $(ARGS)
+
+agent-eval-history:
+	bash scripts/agent-eval.sh history $(ARGS)
+
+agent-eval-compare:
+	bash scripts/agent-eval.sh compare $(ARGS)

@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+For resumable agent work, start with `AGENTS.md`. Complex work should create or update an execution plan in `docs/exec-plans/active/`.
+
 ## Commands
 
 ### Install
@@ -55,6 +57,16 @@ Live evals require a running Ollama stack:
 make live-eval-all
 make live-eval-memory
 make live-eval-sentiment
+```
+
+Agent tool-loop evals:
+
+```bash
+make agent-eval-run ARGS="--scenario preference_recall --provider fake --save-all"
+make agent-eval-all ARGS="--provider fake --record-history --save-all"
+make agent-eval-history
+make agent-eval-compare
+OPENAI_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --provider openai --save-all"
 ```
 
 ### Pipeline debugging (stage-by-stage)
@@ -113,6 +125,12 @@ make scenario-list
 make scenario-run ARGS="--scenario <name>"
 make scenario-show ARGS="--scenario <name>"
 make scenario-compare ARGS="--scenario <name>"
+```
+
+### Harness validation
+
+```bash
+bash scripts/validate-harness.sh
 ```
 
 ---
@@ -213,3 +231,4 @@ All runtime config lives in `config/settings.yaml`. Key sections:
 - **`ingest_turn` embeds the full `User: … Agent: …` text** for richer recall, but classifies on user text only.
 - **`update_from_record` is the hot path** for profile writes (O(1)); `rebuild_from_records` is for maintenance/admin only.
 - **Evals must not use Ollama.** `eval_cli.py` hard-overrides `embeddings.provider = "hash"` — do not remove this.
+- **Agent evals use isolated hash-backed storage.** This keeps tool-loop/model behavior separate from live Ollama embeddings and runtime state.

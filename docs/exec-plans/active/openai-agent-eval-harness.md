@@ -50,6 +50,7 @@ Add a provider-neutral mini agent evaluation harness with OpenAI as the first AP
 ## Progress Log
 
 - 2026-05-06: Created plan while adopting the repo harness.
+- 2026-05-06: Adopted template harness files, added provider-neutral agent eval runner, OpenAI provider, fake provider, CLI, Make targets, docs, and tests.
 
 ## Decisions
 
@@ -57,6 +58,7 @@ Add a provider-neutral mini agent evaluation harness with OpenAI as the first AP
 - Keep OpenAI calls credential-gated through `OPENAI_API_KEY`.
 - Keep generated artifacts local under `artifacts/`.
 - Use fake providers for CI-safe tests and validation.
+- Use isolated hash-backed storage for agent eval runs so provider/tool-loop behavior is separated from live Ollama embeddings.
 
 ## Validation
 

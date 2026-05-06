@@ -57,6 +57,8 @@
 - [x] Eval history and score-trend tracking
 - [x] Live Ollama eval layer with failure artifact capture
 - [x] Scenario-driven qualitative review with saved artifact bundles
+- [x] Provider-neutral agent tool-loop eval harness with fake and OpenAI providers
+- [x] Agent operating harness with resumable execution plans
 - [x] GitHub Actions CI: `make test` + `make eval-all` on push/PR to main
 
 ---
@@ -74,4 +76,4 @@
 
 ### Parity with V1 Ambitions
 - [ ] Prompt profile system (per-user system prompt tuning)
-- [ ] Multi-provider abstraction beyond Ollama
+- [ ] Runtime multi-provider abstraction beyond Ollama

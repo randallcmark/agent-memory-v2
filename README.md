@@ -48,6 +48,7 @@ local agents:
 - deterministic regression evaluation (no Ollama required)
 - live Ollama evaluation for real memory-use and sentiment-behavior checks
 - scenario-driven qualitative review with saved prompt/recall/response artifacts
+- provider-neutral agent tool-loop evaluation with fake and OpenAI providers
 - CI via GitHub Actions on every push and pull request to main
 
 ## Quick Start
@@ -57,6 +58,8 @@ pip install -e '.[dev]'
 make doctor
 make chat
 ```
+
+Agent and maintainer routing starts in `AGENTS.md`.
 
 For named-user operation:
 
@@ -94,9 +97,11 @@ make scenario-show
 - `tests/`: unit and integration tests
 - `evals/`: deterministic and live eval datasets
 - `seeds/`: generic non-sensitive seed data
+- `docs/`: agent operating harness, architecture notes, execution plans, and quality records
 
 ## Documentation
 
+- `AGENTS.md`: short routing map for agents and maintainers
 - `CLAUDE.md`: architecture and command reference for Claude Code sessions
 - `TOOLS.md`: operational and debug workflows with stage-by-stage traceability
 - `STATUS.md`: current implementation state and verified commands

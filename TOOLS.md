@@ -198,6 +198,30 @@ Each scenario run stores a bundle under `artifacts/scenarios/...` containing:
 setup-turn ingestion details, merged recall output, prompt context, final prompt,
 live model response, and scenario review notes.
 
+### Agent tool-loop evaluation
+
+These run scenarios through a provider-neutral agent harness with memory tools.
+The fake provider is deterministic and safe for local validation:
+
+```bash
+make agent-eval-run ARGS="--scenario preference_recall --provider fake --save-all"
+make agent-eval-all ARGS="--provider fake --record-history --save-all"
+make agent-eval-history
+make agent-eval-compare
+```
+
+OpenAI-backed runs require `OPENAI_API_KEY`:
+
+```bash
+OPENAI_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --provider openai --save-all"
+OPENAI_API_KEY=... make agent-eval-all ARGS="--provider openai --record-history --save-all"
+```
+
+Artifacts are written under `artifacts/agent_eval/...` and include provider
+metadata, model name, tool calls, tool results, final answer, invalid-call
+count, memory state, latency, and git metadata. Compact history is written under
+`artifacts/eval_history/agent_eval`.
+
 ---
 
 ## Recommended Routines
@@ -247,6 +271,7 @@ live model response, and scenario review notes.
 | `make eval-*` | `eval_cli.py`, `evals/baseline.json`, `pipeline.py` |
 | `make live-eval-*` | `live_eval_cli.py`, `evals/live_ollama.json`, `ollama.py` |
 | `make scenario-*` | `scenario_cli.py`, `evals/scenarios.json` |
+| `make agent-eval-*` | `agent_eval_cli.py`, `agent_eval.py`, `openai_provider.py`, `evals/scenarios.json` |
 | `make stats`, `make list`, `make rebuild`, `make reset` | `admin.py`, `store.py` |
 | `make aging-report`, `make prune-dry-run`, `make prune` | `aging.py`, `admin.py` |
 | `make maintenance-status`, `make maintain` | `maintenance.py`, `pipeline.py` |

@@ -34,6 +34,8 @@ GitHub Actions CI running on every push and PR to main.
 - Deterministic regression eval harness (forces hash embeddings, no Ollama required)
 - Live Ollama eval layer with failure artifact capture
 - Scenario-driven qualitative review with saved artifact bundles
+- Provider-neutral agent tool-loop eval harness with fake and OpenAI providers
+- Agent operating harness with resumable execution plans under `docs/exec-plans/`
 - GitHub Actions CI: `make test` + `make eval-all` on every push/PR to main
 - `CLAUDE.md` with full architecture guidance for Claude Code sessions
 
@@ -79,6 +81,8 @@ make scenario-compare
 make live-eval-memory
 make live-eval-sentiment
 make live-eval-all
+make agent-eval-run ARGS="--scenario preference_recall --provider fake --save-all"
+bash scripts/validate-harness.sh
 ```
 
 ### Known Limitations
@@ -88,3 +92,4 @@ make live-eval-all
 - Stored historical turn text can contain residual assistant boilerplate from early sessions before prompt cleanup was in place.
 - Multi-user support exists at the storage/profile/admin-routing layer; some helper entrypoints still require `--user` or `AGENT_MEMORY_V2_USER` to target a non-default profile.
 - Qualitative review is scenario-driven and manual; there is no annotation or reviewer-notes workflow on top of saved artifacts.
+- OpenAI agent evals require `OPENAI_API_KEY` and are not part of CI-safe validation.
