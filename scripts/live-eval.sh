@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PYTHON_BIN="${AGENT_MEMORY_V2_PYTHON:-/tmp/agent_memory_v2_venv/bin/python}"
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 
-exec "$PYTHON_BIN" -m agent_memory_v2.live_eval_cli "$@"
+run_python_module agent_memory_v2.live_eval_cli "$@"
