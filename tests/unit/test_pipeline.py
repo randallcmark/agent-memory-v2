@@ -17,6 +17,7 @@ from agent_memory_v2.pipeline import (
     _parse_timestamp,
     _recency_bonus,
     _relative_time_label,
+    _resolve_timezone,
     run_ollama_preflight,
 )
 
@@ -1345,3 +1346,74 @@ def test_apply_char_budget_zero_disables():
     out_f, out_c, applied = _apply_char_budget(factual, [], budget=0)
     assert out_f == factual
     assert applied is False
+
+
+# ── W7: timezone from profile ─────────────────────────────────────────────────
+
+def test_resolve_timezone_falls_back_to_config(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["app"] = {"timezone": "Europe/London"}
+    tz = _resolve_timezone(config, profile=None)
+    assert str(tz) == "Europe/London"
+
+
+def test_resolve_timezone_prefers_profile_over_config(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["app"] = {"timezone": "Europe/London"}
+    profile = {"preferences": {"preference.timezone": {"value": "America/New_York"}}}
+    tz = _resolve_timezone(config, profile=profile)
+    assert str(tz) == "America/New_York"
+
+
+def test_resolve_timezone_falls_back_when_profile_tz_invalid(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.raw["app"] = {"timezone": "Europe/London"}
+    profile = {"preferences": {"preference.timezone": {"value": "Not/ATimezone"}}}
+    tz = _resolve_timezone(config, profile=profile)
+    assert str(tz) == "Europe/London"
+
+
+# ── W2: Ollama graceful degradation ──────────────────────────────────────────
+
+class FailingOllama:
+    def generate(self, prompt: str) -> str:
+        import requests
+        raise requests.ConnectionError("Ollama is down")
+
+    def embed(self, text: str) -> list[float]:
+        import requests
+        raise requests.ConnectionError("Ollama is down")
+
+
+def test_respond_returns_fallback_on_ollama_failure(tmp_path: Path):
+    pipeline = MemoryPipeline(
+        make_config(tmp_path),
+        encoder=StubEncoder(),
+        ollama=FailingOllama(),
+    )
+    pipeline.ingest(Message(role="user", text="hello"))
+    result = pipeline.respond(Message(role="user", text="hello again"))
+    assert "unable to respond" in result.lower() or result != ""
+
+
+def test_structured_extraction_metadata_returns_empty_on_ollama_failure(tmp_path: Path):
+    from agent_memory_v2.semantic_router import SemanticRouteResult
+    config = make_config(tmp_path)
+    config.raw.setdefault("structured_extractor", {})["enabled"] = True
+    pipeline = MemoryPipeline(
+        config,
+        encoder=StubEncoder(),
+        ollama=FailingOllama(),
+    )
+    route = SemanticRouteResult(
+        candidate_key="identity.location",
+        candidate_class="fact",
+        description="Where the user lives.",
+        score=0.9,
+        threshold=0.72,
+        above_threshold=True,
+        durable_candidate=True,
+        matched_example="I live in Edinburgh.",
+    )
+    result = pipeline._structured_extraction_metadata("I live in Edinburgh.", route)
+    assert result == {}

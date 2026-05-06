@@ -95,7 +95,18 @@ def _clean_memory_text(text: str) -> str:
     return cleaned.strip()
 
 
-def _resolve_timezone(config: AppConfig):
+def _resolve_timezone(config: AppConfig, profile: dict | None = None):
+    if profile is not None and ZoneInfo is not None:
+        tz_pref = (
+            profile.get("preferences", {})
+            .get("preference.timezone", {})
+            .get("value")
+        )
+        if tz_pref:
+            try:
+                return ZoneInfo(str(tz_pref))
+            except Exception:
+                pass
     tz_name = config.raw.get("app", {}).get("timezone")
     if tz_name and ZoneInfo is not None:
         try:
@@ -178,11 +189,11 @@ def _age_penalty_for_record(record: MemoryRecord, config: AppConfig) -> float:
     )
 
 
-def _format_recalled_item(item: dict, config: AppConfig) -> str:
+def _format_recalled_item(item: dict, config: AppConfig, profile: dict | None = None) -> str:
     role = item["role"]
     score = item["score"]
     text = _clean_memory_text(item["text"])
-    tz = _resolve_timezone(config)
+    tz = _resolve_timezone(config, profile)
     now_dt = datetime.now(timezone.utc)
 
     suffix_parts: list[str] = [f"score={score:.3f}"]
@@ -279,9 +290,9 @@ def _contextual_prompt_filter(items: list[dict], *, allow_empty: bool = False) -
     return items, []
 
 
-def _build_temporal_context(config: AppConfig) -> str:
+def _build_temporal_context(config: AppConfig, profile: dict | None = None) -> str:
     prompting = config.prompting
-    tz = _resolve_timezone(config)
+    tz = _resolve_timezone(config, profile)
     now_local = datetime.now(tz)
     lines: list[str] = []
 
@@ -463,14 +474,17 @@ class MemoryPipeline:
                 ],
             )
         )
-        extraction = extract_structured_memory(
-            text,
-            route,
-            self.ollama,
-            admission_threshold=float(extractor_cfg.get("admission_threshold", 0.75)),
-            allowed_profile_keys=allowed_profile_keys,
-            max_value_chars=int(extractor_cfg.get("max_value_chars", 160)),
-        )
+        try:
+            extraction = extract_structured_memory(
+                text,
+                route,
+                self.ollama,
+                admission_threshold=float(extractor_cfg.get("admission_threshold", 0.75)),
+                allowed_profile_keys=allowed_profile_keys,
+                max_value_chars=int(extractor_cfg.get("max_value_chars", 160)),
+            )
+        except Exception:
+            return {}
         metadata = {"structured_extraction": extraction.to_metadata()}
         if extraction.accepted:
             metadata.update(_classification_metadata(extraction.to_classification_result()))
@@ -700,7 +714,8 @@ class MemoryPipeline:
 
     def build_prompt(self, message: Message, recalled: list[dict]) -> str:
         input_heading = self.config.prompting["input_heading"]
-        temporal_context = _build_temporal_context(self.config)
+        profile_for_tz = self.profile_store.load() if self.profile_store is not None else None
+        temporal_context = _build_temporal_context(self.config, profile_for_tz)
         prompt_context = self.prompt_context(recalled)
         sentiment = detect_sentiment(message.text)
         factual = prompt_context["factual"]
@@ -714,10 +729,10 @@ class MemoryPipeline:
 
         sections: list[str] = []
         if factual:
-            factual_lines = [_format_recalled_item(item, self.config) for item in factual]
+            factual_lines = [_format_recalled_item(item, self.config, profile_for_tz) for item in factual]
             sections.append("Relevant durable facts:\n" + "\n".join(factual_lines))
         if contextual:
-            context_lines = [_format_recalled_item(item, self.config) for item in contextual]
+            context_lines = [_format_recalled_item(item, self.config, profile_for_tz) for item in contextual]
             sections.append("Relevant conversation context:\n" + "\n".join(context_lines))
         if not sections:
             fallback_heading = (
@@ -750,7 +765,10 @@ class MemoryPipeline:
     def respond(self, message: Message) -> str:
         recalled = self.recall(message)
         prompt = self.build_prompt(message, recalled)
-        response = self.ollama.generate(prompt)
+        try:
+            response = self.ollama.generate(prompt)
+        except Exception:
+            return "I'm unable to respond right now — please try again."
         return response
 
     def maintenance_status(self) -> dict:

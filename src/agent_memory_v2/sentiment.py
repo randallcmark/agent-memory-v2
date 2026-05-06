@@ -3,6 +3,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+_NEGATION_WORDS = frozenset(
+    ["not", "never", "no", "don't", "dont", "didn't", "didnt", "wouldn't", "wouldnt", "shouldn't", "shouldnt"]
+)
+
 
 @dataclass(frozen=True)
 class SentimentResult:
@@ -17,11 +21,17 @@ _POSITIVE_PATTERNS = [
 ]
 
 _NEGATIVE_PATTERNS = [
-    re.compile(r"\b(angry|annoyed|frustrated|upset|furious|hate|terrible|awful|disappointed)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(angry|annoyed|frustrated|upset|furious|hate|terrible|awful|disappointed|sad|unhappy|miserable|confused|lost|stuck|can't figure out)\b",
+        re.IGNORECASE,
+    ),
 ]
 
 _DISTRESS_PATTERNS = [
-    re.compile(r"\b(anxious|overwhelmed|stressed|panic|panicking|worried|scared)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(anxious|overwhelmed|stressed|panic|panicking|worried|scared|struggling|can't cope|breaking down|not okay|falling apart)\b",
+        re.IGNORECASE,
+    ),
 ]
 
 _URGENT_PATTERNS = [
@@ -29,18 +39,34 @@ _URGENT_PATTERNS = [
 ]
 
 
+def _is_negated(text: str, match: re.Match) -> bool:
+    start = match.start()
+    prefix = text[:start]
+    tokens = re.findall(r"\b\w+'\w+|\b\w+\b", prefix)
+    nearby = [t.lower() for t in tokens[-3:]]
+    return any(w in _NEGATION_WORDS for w in nearby)
+
+
+def _any_unnegated(patterns: list[re.Pattern], text: str) -> bool:
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            if not _is_negated(text, match):
+                return True
+    return False
+
+
 def detect_sentiment(text: str) -> SentimentResult:
     cleaned = (text or "").strip()
     lowered = cleaned.lower()
     cues: list[str] = []
 
-    if any(pattern.search(cleaned) for pattern in _DISTRESS_PATTERNS):
+    if _any_unnegated(_DISTRESS_PATTERNS, cleaned):
         cues.append("distress")
-    if any(pattern.search(cleaned) for pattern in _NEGATIVE_PATTERNS):
+    if _any_unnegated(_NEGATIVE_PATTERNS, cleaned):
         cues.append("negative")
-    if any(pattern.search(cleaned) for pattern in _URGENT_PATTERNS):
+    if _any_unnegated(_URGENT_PATTERNS, cleaned):
         cues.append("urgent")
-    if any(pattern.search(cleaned) for pattern in _POSITIVE_PATTERNS):
+    if _any_unnegated(_POSITIVE_PATTERNS, cleaned):
         cues.append("positive")
 
     if "distress" in cues:
