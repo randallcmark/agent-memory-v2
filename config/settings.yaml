@@ -1,3 +1,4 @@
+version: 1
 app:
   name: agent_memory_v2
   timezone: Europe/London
@@ -105,6 +106,7 @@ prompting:
   inject_now: true
   factual_max_items: 3
   contextual_max_items: 2
+  max_context_chars: 3200
   dedupe_profile_facts: true
   drop_nondurable_contextual: true
   temporal_context:

@@ -26,6 +26,22 @@ def _key_mode(profile_key: str) -> str:
     return "scalar"
 
 
+def _upsert(bucket: dict[str, dict], key: str, new_entry: dict, entry_mode: str) -> None:
+    if entry_mode == "additive":
+        existing = bucket.get(key)
+        new_val = new_entry.get("value")
+        if existing is None:
+            all_vals = [new_val] if new_val is not None else []
+            bucket[key] = {**new_entry, "all_values": all_vals}
+        else:
+            all_vals = list(existing.get("all_values") or [])
+            if new_val is not None and new_val not in all_vals:
+                all_vals.append(new_val)
+            bucket[key] = {**new_entry, "all_values": all_vals}
+    else:
+        bucket[key] = new_entry
+
+
 def build_profile(records: list[MemoryRecord]) -> dict:
     preferences: dict[str, dict] = {}
     facts: dict[str, dict] = {}
@@ -46,21 +62,6 @@ def build_profile(records: list[MemoryRecord]) -> dict:
         }
 
         mode = _key_mode(str(profile_key))
-
-        def _upsert(bucket: dict[str, dict], key: str, new_entry: dict, entry_mode: str) -> None:
-            if entry_mode == "additive":
-                existing = bucket.get(key)
-                new_val = new_entry.get("value")
-                if existing is None:
-                    all_vals = [new_val] if new_val is not None else []
-                    bucket[key] = {**new_entry, "all_values": all_vals}
-                else:
-                    all_vals = list(existing.get("all_values") or [])
-                    if new_val is not None and new_val not in all_vals:
-                        all_vals.append(new_val)
-                    bucket[key] = {**new_entry, "all_values": all_vals}
-            else:
-                bucket[key] = new_entry
 
         if record.role == "preference":
             _upsert(preferences, str(profile_key), entry, mode)
@@ -105,5 +106,47 @@ class UserProfileStore:
 
     def rebuild_from_records(self, records: list[MemoryRecord]) -> dict:
         profile = build_profile(records)
+        self.save(profile)
+        return profile
+
+    def update_from_record(self, record: MemoryRecord) -> dict:
+        """Apply a single new sidecar record to the existing profile (O(1) hot path)."""
+        metadata = record.metadata or {}
+        profile_key = metadata.get("profile_key")
+        if not profile_key:
+            return self.load()
+
+        profile = self.load()
+        entry = {
+            "value": metadata.get("extracted_value"),
+            "summary": record.summary,
+            "timestamp": record.timestamp,
+            "memory_class": metadata.get("memory_class", record.role),
+            "source_message_id": metadata.get("source_memory_id", record.message_id),
+        }
+        mode = _key_mode(str(profile_key))
+
+        section_name = {
+            "preference": "preferences",
+            "fact": "facts",
+            "task": "tasks",
+        }.get(record.role)
+
+        if section_name is None:
+            return profile
+
+        section = profile.setdefault(section_name, {})
+        is_new = str(profile_key) not in section
+
+        if record.role == "task":
+            section[str(profile_key)] = entry
+        else:
+            _upsert(section, str(profile_key), entry, mode)
+
+        if is_new:
+            counts = profile.setdefault("counts", {})
+            counts[section_name] = len(section)
+
+        profile["updated_at"] = _utc_now_iso()
         self.save(profile)
         return profile

@@ -16,7 +16,7 @@ from agent_memory_v2.classifier import (
 )
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.embeddings import EmbeddingEncoder, build_encoder
-from agent_memory_v2.models import MemoryRecord, Message, RecallResult
+from agent_memory_v2.models import SCHEMA_VERSION, MemoryRecord, Message, RecallResult
 from agent_memory_v2.maintenance import mark_interaction, maintenance_status, run_maintenance
 from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 from agent_memory_v2.profile import UserProfileStore
@@ -234,6 +234,34 @@ def _dedupe_recalled_items(items: list[dict]) -> list[dict]:
         seen.add(dedupe_key)
         result.append(item)
     return result
+
+
+def _apply_char_budget(
+    factual: list[dict], contextual: list[dict], budget: int
+) -> tuple[list[dict], list[dict], bool]:
+    """Drop trailing items once accumulated text exceeds budget.
+
+    Always includes the first factual item regardless of size so callers
+    always receive something useful even when a single memory is verbose.
+    """
+    if budget <= 0:
+        return factual, contextual, False
+    used = 0
+    out_factual: list[dict] = []
+    for i, item in enumerate(factual):
+        chars = len(str(item.get("text", "")))
+        if i > 0 and used + chars > budget:
+            return out_factual, [], True
+        used += chars
+        out_factual.append(item)
+    out_contextual: list[dict] = []
+    for item in contextual:
+        chars = len(str(item.get("text", "")))
+        if used + chars > budget:
+            return out_factual, out_contextual, True
+        used += chars
+        out_contextual.append(item)
+    return out_factual, out_contextual, False
 
 
 def _contextual_prompt_filter(items: list[dict], *, allow_empty: bool = False) -> tuple[list[dict], list[dict]]:
@@ -483,7 +511,7 @@ class MemoryPipeline:
         embed_text: str | None = None,
     ) -> MemoryRecord:
         vector = self.encoder.encode(embed_text if embed_text is not None else summary)
-        metadata = {**metadata, "taxonomy_version": self._taxonomy_version()}
+        metadata = {**metadata, "schema_version": SCHEMA_VERSION, "taxonomy_version": self._taxonomy_version()}
         record = MemoryRecord(
             memory_id=message_id,
             role=role,
@@ -501,7 +529,7 @@ class MemoryPipeline:
             sidecar_vector = self.encoder.encode(summary)
             self.sidecar_store.add(sidecar_record, sidecar_vector)
             if self.profile_store is not None:
-                self.profile_store.rebuild_from_records(self.sidecar_store.records)
+                self.profile_store.update_from_record(sidecar_record)
         self._append_log(
             {
                 "role": role,
@@ -655,11 +683,19 @@ class MemoryPipeline:
         factual = factual[:factual_limit]
         contextual = contextual[:contextual_limit]
 
+        char_budget = int(prompting_cfg.get("max_context_chars", 0))
+        char_budget_applied = False
+        if char_budget > 0:
+            factual, contextual, char_budget_applied = _apply_char_budget(
+                factual, contextual, char_budget
+            )
+
         return {
             "profile": profile,
             "factual": factual,
             "contextual": contextual,
             "dropped_contextual": dropped_contextual,
+            "char_budget_applied": char_budget_applied,
         }
 
     def build_prompt(self, message: Message, recalled: list[dict]) -> str:

@@ -10,6 +10,7 @@ from agent_memory_v2.embeddings import HashEmbeddingEncoder
 from agent_memory_v2.models import Message
 from agent_memory_v2.pipeline import (
     MemoryPipeline,
+    _apply_char_budget,
     _build_temporal_context,
     _clean_memory_text,
     _format_recalled_item,
@@ -1300,3 +1301,47 @@ def test_ingest_turn_embeds_full_turn_text_in_main_store(tmp_path: Path):
     assert any("Agent:" in t for t in enc.encoded_texts)
     # The user summary alone must also appear (for the sidecar vector)
     assert any(t == "I prefer oat milk." for t in enc.encoded_texts)
+
+
+# ---------------------------------------------------------------------------
+# _apply_char_budget
+# ---------------------------------------------------------------------------
+
+
+def _item(text: str) -> dict:
+    return {"text": text, "role": "fact", "score": 0.9}
+
+
+def test_apply_char_budget_within_budget_unchanged():
+    factual = [_item("hello")]
+    contextual = [_item("world")]
+    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=200)
+    assert out_f == factual
+    assert out_c == contextual
+    assert applied is False
+
+
+def test_apply_char_budget_drops_contextual_when_exceeded():
+    factual = [_item("A" * 100)]
+    contextual = [_item("B" * 100)]
+    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=150)
+    assert len(out_f) == 1
+    assert out_c == []
+    assert applied is True
+
+
+def test_apply_char_budget_drops_factual_when_first_item_exceeds():
+    factual = [_item("A" * 200), _item("B" * 10)]
+    contextual = [_item("C" * 10)]
+    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=150)
+    assert len(out_f) == 1
+    assert out_f[0]["text"] == "A" * 200
+    assert out_c == []
+    assert applied is True
+
+
+def test_apply_char_budget_zero_disables():
+    factual = [_item("A" * 5000)]
+    out_f, out_c, applied = _apply_char_budget(factual, [], budget=0)
+    assert out_f == factual
+    assert applied is False
