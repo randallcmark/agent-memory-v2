@@ -7,7 +7,7 @@ name = "agent-memory-v2"
 version = "0.1.0"
 description = "Clean rebuild of a persistent memory layer for local Ollama-backed agents."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
   "faiss-cpu",
   "numpy",
@@ -58,4 +58,4 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py312"
