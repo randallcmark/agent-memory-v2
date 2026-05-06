@@ -163,15 +163,25 @@ def validate_structured_extraction(
     )
 
 
+def _taxonomy_profile_keys() -> set[str]:
+    try:
+        from agent_memory_v2.taxonomy import get_taxonomy
+        return get_taxonomy().durable_profile_keys()
+    except Exception:
+        return set()
+
+
 def extract_structured_memory(
     text: str,
     route: SemanticRouteResult,
     generator: TextGenerator,
     *,
     admission_threshold: float,
-    allowed_profile_keys: set[str],
+    allowed_profile_keys: set[str] | None = None,
     max_value_chars: int = 160,
 ) -> StructuredExtractionResult:
+    if allowed_profile_keys is None:
+        allowed_profile_keys = _taxonomy_profile_keys()
     raw_response = generator.generate(_build_prompt(text, route, allowed_profile_keys))
     try:
         parsed = _extract_json_object(raw_response)

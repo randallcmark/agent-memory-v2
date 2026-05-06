@@ -1,0 +1,282 @@
+# Agent Memory Taxonomy — single source of truth for all extractable memory keys.
+#
+# version: increment when keys are added, renamed, or semantics change.
+#          Records stamped with a prior version remain valid; aliases handle renames.
+#
+# Key fields:
+#   key         — dot-separated identifier used in profile, metadata, and sidecar
+#   tier1       — broad domain (identity | preference | task | context | ephemeral)
+#   tier2       — specific concept within the domain
+#   mode        — scalar  : latest value replaces prior (name, location)
+#               — additive: values accumulate as a set (allergy, relationship)
+#               — task    : task lifecycle management (open → resolved)
+#   class       — semantic class (fact | preference | task | context | ephemeral)
+#   durable     — true if this key should be stored in the sidecar and profile
+#   description — one-sentence human-readable description (used in LLM prompts)
+#   examples    — representative user utterances for semantic routing
+#   rule_patterns — Python regex strings (IGNORECASE applied); named group 'value'
+#                   captures the extracted value. Empty list = no regex shortcut.
+#   aliases     — former key names that resolve to this key (for migration)
+
+version: 1
+
+keys:
+
+  # ── identity domain ──────────────────────────────────────────────────────
+
+  - key: identity.name
+    tier1: identity
+    tier2: name
+    mode: scalar
+    class: fact
+    durable: true
+    description: "The user's name or preferred form of address."
+    examples:
+      - "My name is Mark."
+      - "I am called Sarah."
+      - "Please call me Alex."
+    rule_patterns:
+      - "\\bmy name is\\s+(?P<value>.+?)(?:[.!?]|$)"
+    aliases: []
+
+  - key: identity.location
+    tier1: identity
+    tier2: location
+    mode: scalar
+    class: fact
+    durable: true
+    description: "Where the user currently lives, is located, or is based."
+    examples:
+      - "I live in Edinburgh."
+      - "I'm based in Edinburgh in the UK."
+      - "I am based in Edinburgh."
+      - "Actually, I am based in Glasgow now."
+      - "My home is in London."
+      - "I currently live in Bristol."
+    rule_patterns:
+      - "\\bI live in\\s+(?P<value>.+?)(?:[.!?]|$)"
+    aliases: []
+
+  - key: identity.occupation
+    tier1: identity
+    tier2: occupation
+    mode: scalar
+    class: fact
+    durable: true
+    description: "The user's occupation, role, or professional identity."
+    examples:
+      - "I work as a software engineer."
+      - "I am a product manager."
+      - "I work at a university."
+      - "My job is data analyst."
+    rule_patterns:
+      - "\\bI work as\\s+(?P<value>.+?)(?:[.!?]|$)"
+    aliases: []
+
+  - key: identity.employer
+    tier1: identity
+    tier2: employer
+    mode: scalar
+    class: fact
+    durable: true
+    description: "The organisation or company the user works for."
+    examples:
+      - "I work at Google."
+      - "I work at a tech startup."
+      - "My company is Acme Corp."
+      - "I work for the NHS."
+    rule_patterns:
+      - "\\bI work at\\s+(?P<value>.+?)(?:[.!?]|$)"
+    aliases: []
+
+  - key: identity.origin
+    tier1: identity
+    tier2: origin
+    mode: scalar
+    class: fact
+    durable: true
+    description: "Where the user is from or the cultural conventions they identify with."
+    examples:
+      - "I'm from Scotland."
+      - "I grew up in Wales."
+      - "My conventions originate in the UK."
+      - "I was raised in Ireland."
+    rule_patterns:
+      - "\\bI'm from\\s+(?P<value>.+?)(?:[.!?]|$)"
+      - "\\bI am from\\s+(?P<value>.+?)(?:[.!?]|$)"
+    aliases: []
+
+  - key: identity.birthday
+    tier1: identity
+    tier2: birthday
+    mode: scalar
+    class: fact
+    durable: true
+    description: "The user's birthday or date of birth."
+    examples:
+      - "My birthday is on the 15th of March."
+      - "I was born on April 3rd."
+      - "My birthday is next Tuesday."
+    rule_patterns:
+      - "\\bmy birthday is\\s+(?P<value>.+?)(?:[.!?]|$)"
+    aliases: []
+
+  - key: identity.dietary
+    tier1: identity
+    tier2: dietary
+    mode: additive
+    class: fact
+    durable: true
+    description: "A dietary restriction, food preference, or eating habit the user follows."
+    examples:
+      - "I'm vegetarian."
+      - "I don't eat meat."
+      - "I'm vegan."
+      - "I don't eat gluten."
+      - "I'm lactose intolerant."
+      - "I keep kosher."
+    rule_patterns: []
+    aliases: []
+
+  - key: identity.allergy
+    tier1: identity
+    tier2: allergy
+    mode: additive
+    class: fact
+    durable: true
+    description: "A food or substance allergy the user has."
+    examples:
+      - "I'm allergic to nuts."
+      - "I'm allergic to penicillin."
+      - "I have a shellfish allergy."
+      - "I have a nut allergy."
+    rule_patterns:
+      - "\\bI am allergic to\\s+(?P<value>.+?)(?:[.!?]|$)"
+    aliases: []
+
+  - key: identity.health
+    tier1: identity
+    tier2: health
+    mode: additive
+    class: fact
+    durable: true
+    description: "A health condition, disability, or ongoing medical fact about the user."
+    examples:
+      - "I have asthma."
+      - "I have Type 2 diabetes."
+      - "I have high blood pressure."
+      - "I'm allergic to penicillin."
+    rule_patterns: []
+    aliases: []
+
+  - key: identity.relationship
+    tier1: identity
+    tier2: relationship
+    mode: additive
+    class: fact
+    durable: true
+    description: "A named relationship or family fact the user has shared."
+    examples:
+      - "My partner's name is Sarah."
+      - "I have two kids."
+      - "My sister lives in Glasgow."
+      - "My son just started school."
+      - "I live with my partner."
+    rule_patterns: []
+    aliases: []
+
+  # ── preference domain ─────────────────────────────────────────────────────
+
+  - key: preference.general
+    tier1: preference
+    tier2: general
+    mode: additive
+    class: preference
+    durable: true
+    description: "A stated preference, liking, dislike, favourite, or preferred option."
+    examples:
+      - "I prefer oat milk."
+      - "I like jasmine tea."
+      - "My favourite colour is blue."
+      - "I don't like coriander."
+    rule_patterns: []
+    aliases: []
+
+  - key: preference.communication
+    tier1: preference
+    tier2: communication
+    mode: scalar
+    class: preference
+    durable: true
+    description: "How the user prefers to receive information or be communicated with."
+    examples:
+      - "I prefer short answers."
+      - "Please be concise."
+      - "I like bullet points."
+      - "Can you keep responses brief?"
+      - "I prefer plain language over technical jargon."
+    rule_patterns: []
+    aliases: []
+
+  - key: preference.schedule
+    tier1: preference
+    tier2: schedule
+    mode: scalar
+    class: preference
+    durable: true
+    description: "The user's preferred times, working patterns, or scheduling habits."
+    examples:
+      - "I work best in the mornings."
+      - "I prefer evening meetings."
+      - "Fridays are my quiet days."
+      - "I usually work from home on Wednesdays."
+      - "Mornings are busy for me."
+    rule_patterns: []
+    aliases: []
+
+  # ── task domain ───────────────────────────────────────────────────────────
+
+  - key: task.general
+    tier1: task
+    tier2: general
+    mode: task
+    class: task
+    durable: true
+    description: "A reminder, to-do, obligation, or future action the user wants retained."
+    examples:
+      - "Remind me to renew my passport."
+      - "I need to call the dentist."
+      - "Don't let me forget to submit the form."
+    rule_patterns: []
+    aliases: []
+
+  # ── context domain (non-profile, informational) ──────────────────────────
+
+  - key: contextual.world_fact
+    tier1: contextual
+    tier2: world_fact
+    mode: additive
+    class: context
+    durable: false
+    description: "A useful external or local-world fact not necessarily about the user's profile."
+    examples:
+      - "The Meadows has cherry blossom trees."
+      - "The spring equinox is used as a convention for the first day of spring."
+      - "There are cherry trees in that park."
+    rule_patterns: []
+    aliases: []
+
+  - key: ephemeral.question
+    tier1: ephemeral
+    tier2: question
+    mode: additive
+    class: ephemeral
+    durable: false
+    description: "A question or transient request that should usually not become durable memory."
+    examples:
+      - "What day is it today?"
+      - "Is there any significance to today?"
+      - "Can you help me with this?"
+      - "What time is it?"
+    rule_patterns: []
+    aliases: []

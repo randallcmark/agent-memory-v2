@@ -75,10 +75,12 @@ def test_semantic_router_detects_dietary_restriction(encoder: HashEmbeddingEncod
 
 
 def test_semantic_router_detects_health_condition(encoder: HashEmbeddingEncoder):
+    # "I'm allergic to nuts." is an example under identity.allergy in the taxonomy.
+    # identity.health covers conditions like "I have asthma." without an allergy frame.
     result = route_semantic_candidate("I'm allergic to nuts.", encoder, threshold=0.72)
 
     assert result is not None
-    assert result.candidate_key == "identity.health"
+    assert result.candidate_key == "identity.allergy"
     assert result.durable_candidate is True
     assert result.above_threshold is True
 

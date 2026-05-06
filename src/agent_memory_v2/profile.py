@@ -15,6 +15,17 @@ def _record_sort_key(record: MemoryRecord) -> tuple[str, str]:
     return record.timestamp, record.memory_id
 
 
+def _key_mode(profile_key: str) -> str:
+    try:
+        from agent_memory_v2.taxonomy import get_taxonomy
+        tk = get_taxonomy().get(profile_key)
+        if tk is not None:
+            return tk.mode
+    except Exception:
+        pass
+    return "scalar"
+
+
 def build_profile(records: list[MemoryRecord]) -> dict:
     preferences: dict[str, dict] = {}
     facts: dict[str, dict] = {}
@@ -34,12 +45,29 @@ def build_profile(records: list[MemoryRecord]) -> dict:
             "source_message_id": metadata.get("source_memory_id", record.message_id),
         }
 
+        mode = _key_mode(str(profile_key))
+
+        def _upsert(bucket: dict[str, dict], key: str, new_entry: dict, entry_mode: str) -> None:
+            if entry_mode == "additive":
+                existing = bucket.get(key)
+                new_val = new_entry.get("value")
+                if existing is None:
+                    all_vals = [new_val] if new_val is not None else []
+                    bucket[key] = {**new_entry, "all_values": all_vals}
+                else:
+                    all_vals = list(existing.get("all_values") or [])
+                    if new_val is not None and new_val not in all_vals:
+                        all_vals.append(new_val)
+                    bucket[key] = {**new_entry, "all_values": all_vals}
+            else:
+                bucket[key] = new_entry
+
         if record.role == "preference":
-            preferences[profile_key] = entry
+            _upsert(preferences, str(profile_key), entry, mode)
         elif record.role == "fact":
-            facts[profile_key] = entry
+            _upsert(facts, str(profile_key), entry, mode)
         elif record.role == "task":
-            tasks[profile_key] = entry
+            tasks[str(profile_key)] = entry
 
     return {
         "updated_at": _utc_now_iso(),

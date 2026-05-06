@@ -59,3 +59,68 @@ def test_build_profile_tracks_latest_fact_separately():
 
     profile = build_profile([older, newer])
     assert profile["facts"]["identity.location"]["value"] == "Bristol"
+
+
+# ---------------------------------------------------------------------------
+# Additive mode compaction
+# ---------------------------------------------------------------------------
+
+
+def test_additive_key_accumulates_all_values():
+    first = make_record(
+        memory_id="a1",
+        role="fact",
+        value="nuts",
+        profile_key="identity.allergy",
+        timestamp="2026-03-29T09:00:00+00:00",
+    )
+    second = make_record(
+        memory_id="a2",
+        role="fact",
+        value="penicillin",
+        profile_key="identity.allergy",
+        timestamp="2026-03-29T10:00:00+00:00",
+    )
+
+    profile = build_profile([first, second])
+    entry = profile["facts"]["identity.allergy"]
+    assert entry["value"] == "penicillin"
+    assert "all_values" in entry
+    assert "nuts" in entry["all_values"]
+    assert "penicillin" in entry["all_values"]
+
+
+def test_additive_key_deduplicates_values():
+    r1 = make_record(
+        memory_id="d1",
+        role="fact",
+        value="vegetarian",
+        profile_key="identity.dietary",
+        timestamp="2026-03-29T09:00:00+00:00",
+    )
+    r2 = make_record(
+        memory_id="d2",
+        role="fact",
+        value="vegetarian",
+        profile_key="identity.dietary",
+        timestamp="2026-03-29T10:00:00+00:00",
+    )
+
+    profile = build_profile([r1, r2])
+    entry = profile["facts"]["identity.dietary"]
+    assert entry["all_values"].count("vegetarian") == 1
+
+
+def test_scalar_key_has_no_all_values():
+    r = make_record(
+        memory_id="s1",
+        role="fact",
+        value="Mark",
+        profile_key="identity.name",
+        timestamp="2026-03-29T09:00:00+00:00",
+    )
+
+    profile = build_profile([r])
+    entry = profile["facts"]["identity.name"]
+    assert entry["value"] == "Mark"
+    assert "all_values" not in entry

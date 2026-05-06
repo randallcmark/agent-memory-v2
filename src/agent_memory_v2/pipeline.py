@@ -461,6 +461,14 @@ class MemoryPipeline:
         metadata.update(extraction_metadata)
         return metadata
 
+    @staticmethod
+    def _taxonomy_version() -> int:
+        try:
+            from agent_memory_v2.taxonomy import get_taxonomy
+            return get_taxonomy().version
+        except Exception:
+            return 0
+
     def _store_memory(
         self,
         *,
@@ -475,6 +483,7 @@ class MemoryPipeline:
         embed_text: str | None = None,
     ) -> MemoryRecord:
         vector = self.encoder.encode(embed_text if embed_text is not None else summary)
+        metadata = {**metadata, "taxonomy_version": self._taxonomy_version()}
         record = MemoryRecord(
             memory_id=message_id,
             role=role,
