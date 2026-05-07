@@ -1,7 +1,11 @@
+"""Core dataclasses: Message, MemoryRecord, RecallResult, and SCHEMA_VERSION constant."""
+
 from __future__ import annotations
 
+__all__ = ["SCHEMA_VERSION", "Message", "MemoryRecord", "RecallResult", "utc_now_iso"]
+
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -9,7 +13,7 @@ SCHEMA_VERSION: int = 1
 
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass(frozen=True)

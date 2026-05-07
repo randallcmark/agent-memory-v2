@@ -1,14 +1,19 @@
+"""User profile store: builds and incrementally updates a JSON summary of sidecar facts."""
+
 from __future__ import annotations
 
+__all__ = ["UserProfileStore", "build_profile"]
+
 import json
-from datetime import datetime, timezone
+import warnings
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_memory_v2.models import MemoryRecord
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _record_sort_key(record: MemoryRecord) -> tuple[str, str]:
@@ -21,8 +26,8 @@ def _key_mode(profile_key: str) -> str:
         tk = get_taxonomy().get(profile_key)
         if tk is not None:
             return tk.mode
-    except Exception:
-        pass
+    except Exception as exc:
+        warnings.warn(f"Failed to resolve taxonomy mode for {profile_key!r}, defaulting to scalar: {exc}", stacklevel=2)
     return "scalar"
 
 

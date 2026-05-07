@@ -6,7 +6,6 @@ import pytest
 
 from agent_memory_v2.taxonomy import Taxonomy, TaxonomyKey, get_taxonomy, load_taxonomy
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -194,7 +193,6 @@ def test_fact_patterns_match_expected_text(taxonomy: Taxonomy) -> None:
 
 
 def test_to_prototypes_covers_durable_keys(taxonomy: Taxonomy) -> None:
-    from agent_memory_v2.semantic_router import SemanticPrototype
     protos = taxonomy.to_prototypes()
     proto_keys = {p.candidate_key for p in protos}
     for tk in taxonomy.keys:
@@ -203,7 +201,6 @@ def test_to_prototypes_covers_durable_keys(taxonomy: Taxonomy) -> None:
 
 
 def test_to_prototypes_excludes_keys_without_examples(taxonomy: Taxonomy) -> None:
-    from agent_memory_v2.semantic_router import SemanticPrototype
     protos = taxonomy.to_prototypes()
     proto_keys = {p.candidate_key for p in protos}
     for tk in taxonomy.keys:
@@ -224,6 +221,7 @@ def test_get_taxonomy_returns_same_object_on_repeated_calls() -> None:
 
 def test_get_taxonomy_explicit_path_bypasses_cache(tmp_path: Path) -> None:
     import shutil
+
     import agent_memory_v2.taxonomy as _tax_mod
     src = Path(__file__).resolve().parents[2] / "config" / "taxonomy.yaml"
     dst = tmp_path / "taxonomy.yaml"

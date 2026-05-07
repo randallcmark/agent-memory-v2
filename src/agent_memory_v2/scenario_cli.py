@@ -1,3 +1,5 @@
+"""Scenario CLI: runs, lists, and compares qualitative memory scenarios for manual review."""
+
 from __future__ import annotations
 
 import argparse

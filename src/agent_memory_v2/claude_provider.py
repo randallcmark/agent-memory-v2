@@ -1,3 +1,5 @@
+"""Claude (Anthropic) provider for the agent eval harness, using the Messages API."""
+
 from __future__ import annotations
 
 import json
@@ -11,7 +13,7 @@ from agent_memory_v2.ollama import _with_retry
 
 
 class ClaudeProvider:
-    provider_name = "claude"
+    provider_name = "anthropic"
 
     def __init__(
         self,
@@ -19,15 +21,26 @@ class ClaudeProvider:
         api_key: str | None = None,
         model: str | None = None,
         base_url: str | None = None,
+        provider_name: str | None = None,
         timeout_seconds: int = 120,
         max_tokens: int = 4096,
     ) -> None:
+        if provider_name:
+            self.provider_name = provider_name
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is required for Claude agent eval runs")
-        self.model_name = model or os.environ.get("AGENT_MEMORY_V2_CLAUDE_MODEL", "claude-sonnet-4-6")
+        self.model_name = (
+            model
+            or os.environ.get("AGENT_MEMORY_V2_ANTHROPIC_MODEL")
+            or os.environ.get("AGENT_MEMORY_V2_CLAUDE_MODEL")
+            or "claude-sonnet-4-20250514"
+        )
         self.base_url = (
-            base_url or os.environ.get("AGENT_MEMORY_V2_CLAUDE_BASE_URL", "https://api.anthropic.com")
+            base_url
+            or os.environ.get("AGENT_MEMORY_V2_ANTHROPIC_BASE_URL")
+            or os.environ.get("AGENT_MEMORY_V2_CLAUDE_BASE_URL")
+            or "https://api.anthropic.com"
         ).rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.max_tokens = max_tokens
@@ -87,7 +100,7 @@ class ClaudeProvider:
                     raw_args = fc.get("arguments") or "{}"
                     try:
                         input_data = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
-                    except Exception:
+                    except (ValueError, TypeError):
                         input_data = {}
                     tool_uses.append(
                         {

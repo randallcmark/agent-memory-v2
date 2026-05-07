@@ -1,6 +1,19 @@
+"""Aging and pruning logic: computes decay penalties and prune decisions based on record age."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+__all__ = [
+    "parse_timestamp",
+    "age_days",
+    "age_bucket",
+    "effective_age_days",
+    "age_penalty",
+    "prune_dry_run_decision",
+    "normalize_task_value",
+    "resolved_task_values",
+]
+
+from datetime import UTC, datetime
 
 from agent_memory_v2.classifier import detect_task_resolution
 from agent_memory_v2.config import AppConfig
@@ -12,8 +25,8 @@ def parse_timestamp(ts: str | None) -> datetime | None:
         return None
     try:
         dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-    except Exception:
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    except ValueError:
         return None
 
 
@@ -21,7 +34,7 @@ def age_days(ts: str | None, *, now_dt: datetime | None = None) -> float | None:
     parsed = parse_timestamp(ts)
     if parsed is None:
         return None
-    now_dt = now_dt or datetime.now(timezone.utc)
+    now_dt = now_dt or datetime.now(UTC)
     delta = now_dt - parsed
     return max(delta.total_seconds(), 0.0) / 86400.0
 
@@ -45,7 +58,7 @@ def effective_age_days(
     *,
     now_dt: datetime | None = None,
 ) -> float | None:
-    now_dt = now_dt or datetime.now(timezone.utc)
+    now_dt = now_dt or datetime.now(UTC)
     created = parse_timestamp(record.timestamp)
     last_recalled = parse_timestamp(record.metadata.get("last_recalled_at"))
     most_recent = max(

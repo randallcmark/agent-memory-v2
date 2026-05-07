@@ -1,4 +1,14 @@
+"""Embedding encoders: hash (CI/test), Ollama, and sentence-transformers backends."""
+
 from __future__ import annotations
+
+__all__ = [
+    "EmbeddingEncoder",
+    "HashEmbeddingEncoder",
+    "OllamaEmbeddingEncoder",
+    "SentenceTransformerEncoder",
+    "build_encoder",
+]
 
 import hashlib
 from functools import lru_cache

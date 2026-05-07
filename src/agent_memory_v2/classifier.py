@@ -1,6 +1,17 @@
+"""Regex-based memory classifier: categorises user text into preference, fact, task, or turn."""
+
 from __future__ import annotations
 
+__all__ = [
+    "ClassificationResult",
+    "classify_text",
+    "detect_task_resolution",
+    "class_priority",
+    "durability_bonus",
+]
+
 import re
+import warnings
 from dataclasses import dataclass
 
 
@@ -42,8 +53,8 @@ def _load_fact_patterns() -> list[tuple[re.Pattern, str]]:
         patterns = get_taxonomy().to_fact_patterns()
         if patterns:
             return patterns
-    except Exception:
-        pass
+    except Exception as exc:
+        warnings.warn(f"Failed to load taxonomy fact patterns, using fallback: {exc}", stacklevel=2)
     return _FALLBACK_FACT_PATTERNS
 
 
@@ -66,6 +77,13 @@ _TASK_RESOLUTION_PATTERNS = [
     re.compile(r"\bI (?:have\s+)?done\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
     re.compile(r"\bI took care of\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
 ]
+
+_CONFIDENCE_PREFERENCE: float = 0.95
+_CONFIDENCE_FACT: float = 0.90
+_CONFIDENCE_TASK: float = 0.85
+_CONFIDENCE_TURN: float = 0.40
+_DURABILITY_BONUS: float = 0.03
+_DURABILITY_PENALTY: float = -0.01
 
 _EPHEMERAL_PATTERNS = [
     re.compile(r"^\s*(hi|hello|hey|good morning|good afternoon|good evening)\b[!. ]*$", re.IGNORECASE),
@@ -106,7 +124,7 @@ def classify_text(text: str, *, default_class: str = "turn") -> ClassificationRe
             return ClassificationResult(
                 "preference",
                 match.group("value").strip(),
-                0.95,
+                _CONFIDENCE_PREFERENCE,
                 True,
                 "user_preference",
                 profile_key,
@@ -118,7 +136,7 @@ def classify_text(text: str, *, default_class: str = "turn") -> ClassificationRe
             return ClassificationResult(
                 "fact",
                 match.group("value").strip(),
-                0.90,
+                _CONFIDENCE_FACT,
                 True,
                 "user_fact",
                 profile_key,
@@ -130,7 +148,7 @@ def classify_text(text: str, *, default_class: str = "turn") -> ClassificationRe
             return ClassificationResult(
                 "task",
                 match.group("value").strip(),
-                0.85,
+                _CONFIDENCE_TASK,
                 True,
                 "user_task",
                 "task.general",
@@ -140,7 +158,7 @@ def classify_text(text: str, *, default_class: str = "turn") -> ClassificationRe
     return ClassificationResult(
         memory_class=default_class,
         extracted_value=None,
-        confidence=0.40,
+        confidence=_CONFIDENCE_TURN,
         durable=durable,
         durability_reason=reason,
         profile_key=None,
@@ -170,4 +188,4 @@ def class_priority(memory_class: str) -> float:
 
 
 def durability_bonus(durable: bool) -> float:
-    return 0.03 if durable else -0.01
+    return _DURABILITY_BONUS if durable else _DURABILITY_PENALTY

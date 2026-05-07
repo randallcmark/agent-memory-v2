@@ -1,5 +1,10 @@
+"""Taxonomy loader: parses config/taxonomy.yaml into TaxonomyKey and Taxonomy dataclasses."""
+
 from __future__ import annotations
 
+__all__ = ["TaxonomyKey", "Taxonomy", "load_taxonomy", "get_taxonomy"]
+
+import contextlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,10 +56,8 @@ class Taxonomy:
         result: list[tuple[re.Pattern, str]] = []
         for tk in self.keys:
             for raw in tk.rule_patterns:
-                try:
+                with contextlib.suppress(re.error):
                     result.append((re.compile(raw, re.IGNORECASE), tk.key))
-                except re.error:
-                    pass
         return result
 
     def to_prototypes(self) -> tuple:

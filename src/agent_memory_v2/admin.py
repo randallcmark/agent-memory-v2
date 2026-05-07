@@ -1,9 +1,12 @@
+"""Admin CLI: prune, rebuild, backup, restore, seed, and inspect the live memory stores."""
+
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_memory_v2.aging import (
@@ -241,7 +244,7 @@ def get_aging_report(config: AppConfig) -> dict:
     records = store.records
     bucket_counts: dict[str, int] = {}
     class_bucket_counts: dict[str, dict[str, int]] = {}
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
 
     for record in records:
         days = age_days(record.timestamp, now_dt=now_dt)
@@ -275,7 +278,7 @@ def _task_prune_decisions(records: list[MemoryRecord], config: AppConfig) -> dic
     prune_cfg = config.aging.get("prune", {}) or {}
     task_ttl = float(prune_cfg.get("task_ttl_days", 90))
     resolved_task_ttl = float(prune_cfg.get("resolved_task_ttl_days", 7))
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
     decisions: dict[str, dict] = {}
 
     for record in records:
@@ -383,7 +386,7 @@ def prune_dry_run(config: AppConfig, *, limit: int | None = None) -> dict:
 
 def _prune_decision_payload(config: AppConfig) -> dict:
     store = _build_store(config)
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
     base_decisions = [
         {
             **prune_dry_run_decision(record, config=config, now_dt=now_dt),
@@ -534,7 +537,7 @@ def _parse_ts(ts: str | None) -> datetime | None:
         return None
     try:
         dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
     except Exception:
         return None
 
@@ -566,9 +569,7 @@ def _matches_filters(
     to_ts = _parse_ts(date_to) if date_to else None
     if from_ts is not None and (record_ts is None or record_ts < from_ts):
         return False
-    if to_ts is not None and (record_ts is None or record_ts > to_ts):
-        return False
-    return True
+    return not (to_ts is not None and (record_ts is None or record_ts > to_ts))
 
 
 def list_memories(
@@ -747,10 +748,8 @@ def _read_archive_records(archive_path: Path) -> list[dict]:
         for line in fh:
             stripped = line.strip()
             if stripped:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     records.append(json.loads(stripped))
-                except json.JSONDecodeError:
-                    pass
     return records
 
 
@@ -1028,7 +1027,6 @@ def main() -> int:
         return 0 if "error" not in result else 1
 
     if args.command == "check-schema":
-        import warnings
         from agent_memory_v2.models import SCHEMA_VERSION
         store = _build_store(config)
         stale = [r.memory_id for r in store.records if r.metadata.get("schema_version", 0) != SCHEMA_VERSION]

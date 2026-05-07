@@ -1,4 +1,8 @@
+"""FAISS-backed MemoryStore: persists and searches embedding vectors with JSON metadata."""
+
 from __future__ import annotations
+
+__all__ = ["MemoryStore"]
 
 import json
 import warnings

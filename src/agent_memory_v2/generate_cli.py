@@ -1,3 +1,5 @@
+"""CLI for sending a prompt directly to the configured Ollama LLM and printing the response."""
+
 from __future__ import annotations
 
 import argparse

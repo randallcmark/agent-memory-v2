@@ -1,3 +1,5 @@
+"""Shared CLI input resolver: reads text from --text arg, a file path, or stdin."""
+
 from __future__ import annotations
 
 import sys

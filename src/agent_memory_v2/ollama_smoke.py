@@ -1,3 +1,5 @@
+"""Ollama smoke test: verifies Ollama reachability and optionally runs a generate call."""
+
 from __future__ import annotations
 
 import argparse

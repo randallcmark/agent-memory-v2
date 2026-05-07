@@ -1,4 +1,8 @@
+"""Sentiment detector: classifies user text as neutral, positive, negative, distressed, or urgent."""
+
 from __future__ import annotations
+
+__all__ = ["SentimentResult", "detect_sentiment"]
 
 import re
 from dataclasses import dataclass

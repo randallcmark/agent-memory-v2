@@ -1,3 +1,5 @@
+"""Live eval CLI: runs recall and memory pipeline evals against a live Ollama instance."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,8 +12,8 @@ from typing import Any
 
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.eval_history import (
-    compare_summaries,
     compact_summary,
+    compare_summaries,
     find_previous_comparable,
     load_history,
     write_history,

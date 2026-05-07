@@ -11,7 +11,7 @@ This project stores user memory and model traces. Treat artifacts as potentially
 
 ## External Calls
 
-- OpenAI calls require `OPENAI_API_KEY`.
+- OpenAI calls require `OPENAI_API_KEY`; Anthropic calls require `ANTHROPIC_API_KEY`.
 - Do not make external provider calls in tests unless explicitly marked manual.
 - Validate tool-call payloads before executing memory operations.
 - Record provider errors in artifacts without exposing secret values.

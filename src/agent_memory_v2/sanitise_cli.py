@@ -1,3 +1,5 @@
+"""Sanitise CLI: strips runtime state (indexes, logs, profiles) before publishing to GitHub."""
+
 from __future__ import annotations
 
 import argparse

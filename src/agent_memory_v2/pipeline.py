@@ -1,34 +1,47 @@
+"""Central MemoryPipeline: orchestrates ingest, recall, prompt construction, and the chat loop."""
+
 from __future__ import annotations
+
+__all__ = [
+    "MemoryPipeline",
+    "summarize_for_memory",
+    "summarize_turn_for_memory",
+    "should_run_semantic_router",
+    "clean_memory_text",
+    "resolve_timezone",
+    "relative_time_label",
+    "recency_bonus",
+    "format_recalled_item",
+    "apply_char_budget",
+    "build_temporal_context",
+    "run_ollama_preflight",
+]
 
 import argparse
 import json
 import os
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from agent_memory_v2.aging import age_penalty, effective_age_days, parse_timestamp
 from agent_memory_v2.classifier import (
     ClassificationResult,
-    classify_text,
     class_priority,
+    classify_text,
     durability_bonus,
 )
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.embeddings import EmbeddingEncoder, build_encoder
+from agent_memory_v2.maintenance import maintenance_status, mark_interaction, run_maintenance
 from agent_memory_v2.models import SCHEMA_VERSION, MemoryRecord, Message, RecallResult
-from agent_memory_v2.maintenance import mark_interaction, maintenance_status, run_maintenance
 from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 from agent_memory_v2.profile import UserProfileStore
-from agent_memory_v2.sentiment import SentimentResult, detect_sentiment
 from agent_memory_v2.semantic_router import SemanticRouteResult, route_semantic_candidate
+from agent_memory_v2.sentiment import SentimentResult, detect_sentiment
 from agent_memory_v2.store import MemoryStore
 from agent_memory_v2.structured_extractor import extract_structured_memory
-
-try:
-    from zoneinfo import ZoneInfo
-except Exception:  # pragma: no cover
-    ZoneInfo = None
 
 
 def summarize_for_memory(message: Message) -> str:
@@ -51,7 +64,7 @@ def _classification_metadata(result: ClassificationResult) -> dict:
     }
 
 
-def _should_run_semantic_router(result: ClassificationResult) -> bool:
+def should_run_semantic_router(result: ClassificationResult) -> bool:
     return not result.durable and result.memory_class in {"turn", "message"}
 
 
@@ -86,7 +99,7 @@ def _build_sidecar_record(record: MemoryRecord) -> MemoryRecord:
     )
 
 
-def _normalize_embedding_text(text: str) -> str:
+def _normalize_embedding_text(text: str) -> str:  # internal — used only within pipeline
     normalized = re.sub(r"[^a-z0-9]+", " ", str(text).lower())
     normalized = re.sub(r"\s+", " ", normalized).strip()
     return normalized
@@ -108,7 +121,7 @@ def _sidecar_vector_text(record: MemoryRecord) -> str:
     return _normalize_embedding_text(" ".join(parts))
 
 
-def _clean_memory_text(text: str) -> str:
+def clean_memory_text(text: str) -> str:
     cleaned = (text or "").strip()
     cleaned = re.sub(r"Agent:\s*Your response:\s*", "Agent: ", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"(?im)^\s*Your response:\s*", "", cleaned)
@@ -117,8 +130,8 @@ def _clean_memory_text(text: str) -> str:
     return cleaned.strip()
 
 
-def _resolve_timezone(config: AppConfig, profile: dict | None = None):
-    if profile is not None and ZoneInfo is not None:
+def resolve_timezone(config: AppConfig, profile: dict | None = None):
+    if profile is not None:
         tz_pref = (
             profile.get("preferences", {})
             .get("preference.timezone", {})
@@ -127,26 +140,23 @@ def _resolve_timezone(config: AppConfig, profile: dict | None = None):
         if tz_pref:
             try:
                 return ZoneInfo(str(tz_pref))
-            except Exception:
+            except (ValueError, KeyError):
                 pass
     tz_name = config.raw.get("app", {}).get("timezone")
-    if tz_name and ZoneInfo is not None:
+    if tz_name:
         try:
             return ZoneInfo(tz_name)
-        except Exception:
+        except (ValueError, KeyError):
             pass
     return datetime.now().astimezone().tzinfo
 
 
-def _parse_timestamp(ts: str | None) -> datetime | None:
-    return parse_timestamp(ts)
 
-
-def _relative_time_label(past_dt: datetime, now_dt: datetime, tz) -> str:
+def relative_time_label(past_dt: datetime, now_dt: datetime, tz) -> str:
     try:
         past_local = past_dt.astimezone(tz) if tz else past_dt
         now_local = now_dt.astimezone(tz) if tz else now_dt
-    except Exception:
+    except (TypeError, OverflowError, OSError):
         past_local = past_dt
         now_local = now_dt
 
@@ -178,12 +188,12 @@ def _relative_time_label(past_dt: datetime, now_dt: datetime, tz) -> str:
     return f"{years} years ago"
 
 
-def _recency_bonus(ts: str | None, now_dt: datetime | None = None) -> float:
-    parsed = _parse_timestamp(ts)
+def recency_bonus(ts: str | None, now_dt: datetime | None = None) -> float:
+    parsed = parse_timestamp(ts)
     if parsed is None:
         return 0.0
 
-    now_dt = now_dt or datetime.now(timezone.utc)
+    now_dt = now_dt or datetime.now(UTC)
     delta_seconds = max((now_dt - parsed).total_seconds(), 0.0)
     if delta_seconds <= 6 * 60 * 60:
         return 0.02
@@ -211,17 +221,17 @@ def _age_penalty_for_record(record: MemoryRecord, config: AppConfig) -> float:
     )
 
 
-def _format_recalled_item(item: dict, config: AppConfig, profile: dict | None = None) -> str:
+def format_recalled_item(item: dict, config: AppConfig, profile: dict | None = None) -> str:
     role = item["role"]
     score = item["score"]
-    text = _clean_memory_text(item["text"])
-    tz = _resolve_timezone(config, profile)
-    now_dt = datetime.now(timezone.utc)
+    text = clean_memory_text(item["text"])
+    tz = resolve_timezone(config, profile)
+    now_dt = datetime.now(UTC)
 
     suffix_parts: list[str] = [f"score={score:.3f}"]
-    parsed = _parse_timestamp(item.get("timestamp"))
+    parsed = parse_timestamp(item.get("timestamp"))
     if parsed is not None:
-        relative = _relative_time_label(parsed, now_dt, tz)
+        relative = relative_time_label(parsed, now_dt, tz)
         absolute = parsed.astimezone(tz).strftime("%A, %d %b %Y, %H:%M (%Z)")
         suffix_parts.append(f"relative={relative}")
         suffix_parts.append(f"at={absolute}")
@@ -260,7 +270,7 @@ def _dedupe_recalled_items(items: list[dict]) -> list[dict]:
         dedupe_key = (
             str(item.get("store_kind", "")),
             str(item.get("source_message_id", item.get("message_id", ""))),
-            _clean_memory_text(str(item.get("text", ""))).lower(),
+            clean_memory_text(str(item.get("text", ""))).lower(),
         )
         if dedupe_key in seen:
             continue
@@ -269,7 +279,7 @@ def _dedupe_recalled_items(items: list[dict]) -> list[dict]:
     return result
 
 
-def _apply_char_budget(
+def apply_char_budget(
     factual: list[dict], contextual: list[dict], budget: int
 ) -> tuple[list[dict], list[dict], bool]:
     """Drop trailing items once accumulated text exceeds budget.
@@ -315,14 +325,12 @@ def _contextual_prompt_filter(items: list[dict], *, allow_empty: bool = False) -
 def _should_replace_recalled_item(existing: dict, candidate: dict) -> bool:
     existing_kind = str(existing.get("store_kind", ""))
     candidate_kind = str(candidate.get("store_kind", ""))
-    if candidate_kind == "sidecar_memory" and existing_kind != "sidecar_memory":
-        return True
-    return False
+    return candidate_kind == "sidecar_memory" and existing_kind != "sidecar_memory"
 
 
-def _build_temporal_context(config: AppConfig, profile: dict | None = None) -> str:
+def build_temporal_context(config: AppConfig, profile: dict | None = None) -> str:
     prompting = config.prompting
-    tz = _resolve_timezone(config, profile)
+    tz = resolve_timezone(config, profile)
     now_local = datetime.now(tz)
     lines: list[str] = []
 
@@ -465,7 +473,7 @@ class MemoryPipeline:
         router_cfg = self.config.semantic_router
         if not router_cfg.get("enabled", False):
             return None
-        if not _should_run_semantic_router(classification):
+        if not should_run_semantic_router(classification):
             return None
         return route_semantic_candidate(
             text,
@@ -538,7 +546,7 @@ class MemoryPipeline:
         try:
             from agent_memory_v2.taxonomy import get_taxonomy
             return get_taxonomy().version
-        except Exception:
+        except (ImportError, AttributeError):
             return 0
 
     def _store_memory(
@@ -637,7 +645,7 @@ class MemoryPipeline:
         return deduped
 
     def _track_recall(self, items: list[RecallResult]) -> None:
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         for item in items:
             record = item.record
             recall_count = int(record.metadata.get("recall_count", 0)) + 1
@@ -698,7 +706,7 @@ class MemoryPipeline:
             + class_priority(item.record.metadata.get("memory_class", item.record.role))
             + durability_bonus(bool(item.record.metadata.get("durable", False)))
             + _store_kind_bonus(item.record.metadata.get("kind"))
-            + _recency_bonus(item.record.timestamp)
+            + recency_bonus(item.record.timestamp)
             + _age_penalty_for_record(item.record, self.config)
             + self._query_intent_bonus(item, query_route)
         )
@@ -709,7 +717,7 @@ class MemoryPipeline:
             "score": item.score,
             "rank_score": self._rank_key(item)[0],
             "durability_bonus": durability_bonus(bool(item.record.metadata.get("durable", False))),
-            "recency_bonus": _recency_bonus(item.record.timestamp),
+            "recency_bonus": recency_bonus(item.record.timestamp),
             "age_penalty": _age_penalty_for_record(item.record, self.config),
             "store_kind_bonus": _store_kind_bonus(item.record.metadata.get("kind")),
             "role": item.record.role,
@@ -760,7 +768,7 @@ class MemoryPipeline:
         char_budget = int(prompting_cfg.get("max_context_chars", 0))
         char_budget_applied = False
         if char_budget > 0:
-            factual, contextual, char_budget_applied = _apply_char_budget(
+            factual, contextual, char_budget_applied = apply_char_budget(
                 factual, contextual, char_budget
             )
 
@@ -775,7 +783,7 @@ class MemoryPipeline:
     def build_prompt(self, message: Message, recalled: list[dict]) -> str:
         input_heading = self.config.prompting["input_heading"]
         profile_for_tz = self.profile_store.load() if self.profile_store is not None else None
-        temporal_context = _build_temporal_context(self.config, profile_for_tz)
+        temporal_context = build_temporal_context(self.config, profile_for_tz)
         prompt_context = self.prompt_context(recalled)
         sentiment = detect_sentiment(message.text)
         factual = prompt_context["factual"]
@@ -789,10 +797,10 @@ class MemoryPipeline:
 
         sections: list[str] = []
         if factual:
-            factual_lines = [_format_recalled_item(item, self.config, profile_for_tz) for item in factual]
+            factual_lines = [format_recalled_item(item, self.config, profile_for_tz) for item in factual]
             sections.append("Relevant durable facts:\n" + "\n".join(factual_lines))
         if contextual:
-            context_lines = [_format_recalled_item(item, self.config, profile_for_tz) for item in contextual]
+            context_lines = [format_recalled_item(item, self.config, profile_for_tz) for item in contextual]
             sections.append("Relevant conversation context:\n" + "\n".join(context_lines))
         if not sections:
             fallback_heading = (

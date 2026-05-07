@@ -1,11 +1,14 @@
+"""Deferred maintenance runner: prunes stale records, rebuilds the profile, manages a run lock."""
+
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from agent_memory_v2.admin import (
@@ -19,7 +22,7 @@ from agent_memory_v2.config import AppConfig, load_config
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _utc_now_iso() -> str:
@@ -31,8 +34,8 @@ def _parse_ts(ts: str | None) -> datetime | None:
         return None
     try:
         dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-    except Exception:
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    except ValueError:
         return None
 
 
@@ -129,10 +132,8 @@ def maintenance_lock(config: AppConfig):
         os.close(fd)
         yield path
     finally:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             path.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def maintenance_status(config: AppConfig) -> dict:

@@ -1,3 +1,5 @@
+"""Embedding smoke test: encodes a sample text and prints the resulting vector summary."""
+
 from __future__ import annotations
 
 import argparse

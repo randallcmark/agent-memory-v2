@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_memory_v2.eval_history import compare_summaries, compact_summary, load_history, write_history
+from agent_memory_v2.eval_history import (
+    compact_summary,
+    compare_summaries,
+    load_history,
+    write_history,
+)
 
 
 def test_compact_summary_includes_scores(tmp_path: Path) -> None:

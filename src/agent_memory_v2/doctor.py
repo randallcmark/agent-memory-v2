@@ -1,3 +1,5 @@
+"""Doctor CLI: checks Ollama reachability, model presence, and embedding connectivity."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +9,6 @@ from tempfile import TemporaryDirectory
 
 from agent_memory_v2.admin import get_store_stats
 from agent_memory_v2.config import load_config
-from agent_memory_v2.e2e_smoke import main as e2e_main
 from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 
 
@@ -47,8 +48,8 @@ def run_doctor() -> dict:
             )
         )
 
-        from agent_memory_v2.pipeline import MemoryPipeline
         from agent_memory_v2.models import Message
+        from agent_memory_v2.pipeline import MemoryPipeline
 
         pipeline = MemoryPipeline(doctor_config, ollama=doctor_client)
         first_user = Message(role="user", text="Please remember that I prefer oat milk.")

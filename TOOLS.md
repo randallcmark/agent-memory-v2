@@ -217,6 +217,14 @@ OPENAI_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --prov
 OPENAI_API_KEY=... make agent-eval-all ARGS="--provider openai --record-history --save-all"
 ```
 
+Anthropic-backed Claude runs require `ANTHROPIC_API_KEY`. Prefer the provider name
+`anthropic`; `claude` is retained as a compatibility alias:
+
+```bash
+ANTHROPIC_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --provider anthropic --save-all"
+ANTHROPIC_API_KEY=... make agent-eval-all ARGS="--provider anthropic --record-history --save-all"
+```
+
 Artifacts are written under `artifacts/agent_eval/...` and include provider
 metadata, model name, tool calls, tool results, final answer, invalid-call
 count, memory state, latency, and git metadata. Compact history is written under

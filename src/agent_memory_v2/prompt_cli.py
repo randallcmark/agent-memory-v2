@@ -1,3 +1,5 @@
+"""CLI that assembles and prints the full memory-augmented prompt for a given user query."""
+
 from __future__ import annotations
 
 import argparse

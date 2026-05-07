@@ -67,6 +67,7 @@ make agent-eval-all ARGS="--provider fake --record-history --save-all"
 make agent-eval-history
 make agent-eval-compare
 OPENAI_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --provider openai --save-all"
+ANTHROPIC_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --provider anthropic --save-all"
 ```
 
 ### Pipeline debugging (stage-by-stage)

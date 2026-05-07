@@ -1,3 +1,5 @@
+"""End-to-end smoke test: ingests a turn and recalls it to verify the full pipeline."""
+
 from __future__ import annotations
 
 import argparse

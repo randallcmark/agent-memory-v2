@@ -1,9 +1,11 @@
+"""AppConfig dataclass and load_config(): wraps settings.yaml with typed property accessors."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
-from pathlib import Path
 import re
+from dataclasses import dataclass
+from pathlib import Path
 
 import yaml
 

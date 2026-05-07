@@ -35,7 +35,7 @@
 
 ## Provider Model
 
-Ollama is the existing generation and embedding provider. The agent-eval harness adds provider-neutral agent behavior with OpenAI as the first API-backed provider. Provider code must stay behind interfaces so future Claude, Gemini, or local-agent providers can be added without changing memory mechanics.
+Ollama is the existing generation and embedding provider. The agent-eval harness adds provider-neutral agent behavior with OpenAI and Anthropic as API-backed providers. Provider code must stay behind interfaces so future Gemini or local-agent providers can be added without changing memory mechanics.
 
 ## Key Docs
 

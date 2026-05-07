@@ -1,7 +1,16 @@
+"""Structured extractor: asks the LLM to extract a typed JSON memory from a semantic candidate."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+__all__ = [
+    "TextGenerator",
+    "StructuredExtractionResult",
+    "validate_structured_extraction",
+    "extract_structured_memory",
+]
+
 import json
+from dataclasses import dataclass
 from typing import Protocol
 
 from agent_memory_v2.classifier import ClassificationResult
@@ -164,10 +173,12 @@ def validate_structured_extraction(
 
 
 def _taxonomy_profile_keys() -> set[str]:
+    import warnings
     try:
         from agent_memory_v2.taxonomy import get_taxonomy
         return get_taxonomy().durable_profile_keys()
-    except Exception:
+    except Exception as exc:
+        warnings.warn(f"Failed to load taxonomy profile keys, returning empty set: {exc}", stacklevel=2)
         return set()
 
 

@@ -1,3 +1,5 @@
+"""Agent tool-loop eval harness: runs memory scenarios against a provider and scores results."""
+
 from __future__ import annotations
 
 import copy

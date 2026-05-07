@@ -1,3 +1,5 @@
+"""CLI for classifying text as memory: shows memory class, confidence, and optional semantic routing."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,7 +11,7 @@ from agent_memory_v2.cli_inputs import resolve_text_input
 from agent_memory_v2.config import load_config
 from agent_memory_v2.embeddings import build_encoder
 from agent_memory_v2.ollama import OllamaClient, OllamaProfile
-from agent_memory_v2.pipeline import _should_run_semantic_router
+from agent_memory_v2.pipeline import should_run_semantic_router
 from agent_memory_v2.semantic_router import route_semantic_candidate
 from agent_memory_v2.structured_extractor import extract_structured_memory
 
@@ -52,7 +54,7 @@ def main() -> int:
     }
     if args.semantic or args.extract:
         config = load_config()
-        if _should_run_semantic_router(result):
+        if should_run_semantic_router(result):
             router_cfg = config.semantic_router
             encoder = build_encoder(
                 provider=config.embeddings.get("provider", "hash"),

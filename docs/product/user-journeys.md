@@ -30,4 +30,4 @@ The evaluator runs `make scenario-run ARGS="--scenario <name>"` and reviews save
 
 ## Run Agent Evals
 
-The evaluator runs `make agent-eval-run ARGS="--scenario <name> --provider fake"` for local validation or `--provider openai` for API-backed agent-class behavior. The run produces a trace of model/tool-loop decisions and memory operations.
+The evaluator runs `make agent-eval-run ARGS="--scenario <name> --provider fake"` for local validation, `--provider openai` for OpenAI-backed behavior, or `--provider anthropic` for Anthropic-backed Claude behavior. The run produces a trace of model/tool-loop decisions and memory operations.

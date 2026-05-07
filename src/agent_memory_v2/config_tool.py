@@ -1,3 +1,5 @@
+"""CLI for inspecting and patching values in config/settings.yaml."""
+
 from __future__ import annotations
 
 import argparse

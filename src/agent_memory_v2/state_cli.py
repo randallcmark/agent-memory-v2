@@ -1,3 +1,5 @@
+"""State CLI: displays, resets, and manages runtime state (maintenance, profile, store stats)."""
+
 from __future__ import annotations
 
 import argparse

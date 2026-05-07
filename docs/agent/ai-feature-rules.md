@@ -15,5 +15,5 @@ AI behavior in this repo must be observable, testable, and separable from memory
 ## Provider Guidance
 
 - Ollama remains the local default for current live evals.
-- OpenAI is the first agent-class API provider for the mini agent harness.
-- Claude, Gemini, and cloud GPU providers are deferred until the OpenAI harness produces comparable traces.
+- OpenAI and Anthropic are the current API providers for the mini agent harness.
+- Gemini and cloud GPU providers are deferred until the existing API harnesses produce comparable traces.

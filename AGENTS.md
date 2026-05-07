@@ -28,6 +28,7 @@ This file is a map for agents working in this repository. Keep it short enough t
 - Architecture: `docs/architecture/index.md`
 - Boundaries: `docs/architecture/boundaries.md`
 - Task protocol: `docs/agent/task-protocol.md`
+- Code standards: `docs/agent/code-standards.md`
 - Validation: `docs/agent/validation.md`
 - Technical debt: `docs/quality/technical-debt.md`
 - Active plans: `docs/exec-plans/active/`

@@ -1,3 +1,5 @@
+"""Deterministic eval CLI: runs classification, semantic, sentiment, and recall eval suites."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,8 +12,8 @@ from agent_memory_v2.classifier import classify_text
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.embeddings import HashEmbeddingEncoder
 from agent_memory_v2.eval_history import (
-    compare_summaries,
     compact_summary,
+    compare_summaries,
     find_previous_comparable,
     load_history,
     write_history,

@@ -1,3 +1,5 @@
+"""CLI for recalling memories relevant to a query text and printing scored results."""
+
 from __future__ import annotations
 
 import argparse

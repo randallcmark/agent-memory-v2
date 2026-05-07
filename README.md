@@ -48,7 +48,7 @@ local agents:
 - deterministic regression evaluation (no Ollama required)
 - live Ollama evaluation for real memory-use and sentiment-behavior checks
 - scenario-driven qualitative review with saved prompt/recall/response artifacts
-- provider-neutral agent tool-loop evaluation with fake and OpenAI providers
+- provider-neutral agent tool-loop evaluation with fake, OpenAI, and Anthropic providers
 - CI via GitHub Actions on every push and pull request to main
 
 ## Quick Start

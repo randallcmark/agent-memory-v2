@@ -1,3 +1,5 @@
+"""OpenAI provider for the agent eval harness, using the Responses API."""
+
 from __future__ import annotations
 
 import json
@@ -24,7 +26,7 @@ class OpenAIProvider:
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         if not self.api_key:
             raise RuntimeError("OPENAI_API_KEY is required for OpenAI agent eval runs")
-        self.model_name = model or os.environ.get("AGENT_MEMORY_V2_OPENAI_MODEL", "gpt-4o")
+        self.model_name = model or os.environ.get("AGENT_MEMORY_V2_OPENAI_MODEL", "gpt-5.1")
         self.base_url = (base_url or os.environ.get("AGENT_MEMORY_V2_OPENAI_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
         self.timeout_seconds = timeout_seconds
 
@@ -59,7 +61,7 @@ class OpenAIProvider:
             raw_args = item.get("arguments") or "{}"
             try:
                 args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
-            except Exception:
+            except (ValueError, TypeError):
                 args = {}
             calls.append(
                 AgentToolCall(

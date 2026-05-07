@@ -1,12 +1,15 @@
+"""Ollama HTTP client with retry logic for generate and embed endpoints."""
+
 from __future__ import annotations
 
+__all__ = ["OllamaProfile", "OllamaClient"]
+
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, TypeVar
+from typing import Any
 
 import requests
-
-_T = TypeVar("_T")
 
 
 @dataclass(frozen=True)
@@ -19,17 +22,17 @@ class OllamaProfile:
     raw_prompt: bool = False
 
 
-def _with_retry(
-    fn: Callable[[], _T],
+def _with_retry[T](
+    fn: Callable[[], T],
     *,
     max_attempts: int = 3,
     base_delay: float = 1.0,
-) -> _T:
+) -> T:
     """Retry fn on transient network errors with exponential backoff."""
     for attempt in range(max_attempts):
         try:
             return fn()
-        except (requests.ConnectionError, requests.Timeout) as exc:
+        except (requests.ConnectionError, requests.Timeout):
             if attempt == max_attempts - 1:
                 raise
             time.sleep(base_delay * (2 ** attempt))

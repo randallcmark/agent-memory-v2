@@ -1,10 +1,24 @@
+"""Embedding-based semantic router: matches user text against taxonomy prototype examples."""
+
 from __future__ import annotations
 
+__all__ = [
+    "DEFAULT_THRESHOLD",
+    "SemanticPrototype",
+    "SemanticRouteResult",
+    "SemanticRouter",
+    "route_semantic_candidate",
+    "PROTOTYPES",
+]
+
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
 
 from agent_memory_v2.embeddings import EmbeddingEncoder
+
+DEFAULT_THRESHOLD: float = 0.72
 
 
 @dataclass(frozen=True)
@@ -44,7 +58,8 @@ def _load_prototypes() -> tuple[SemanticPrototype, ...]:
     try:
         from agent_memory_v2.taxonomy import get_taxonomy
         return get_taxonomy().to_prototypes()
-    except Exception:
+    except Exception as exc:
+        warnings.warn(f"Failed to load taxonomy prototypes, using fallback: {exc}", stacklevel=2)
         return _FALLBACK_PROTOTYPES
 
 
@@ -64,7 +79,7 @@ class SemanticRouter:
         encoder: EmbeddingEncoder,
         *,
         prototypes: tuple[SemanticPrototype, ...] | None = None,
-        threshold: float = 0.72,
+        threshold: float = DEFAULT_THRESHOLD,
     ) -> None:
         self.encoder = encoder
         self.prototypes = prototypes if prototypes is not None else _load_prototypes()
@@ -101,7 +116,7 @@ def route_semantic_candidate(
     text: str,
     encoder: EmbeddingEncoder,
     *,
-    threshold: float = 0.72,
+    threshold: float = DEFAULT_THRESHOLD,
     prototypes: tuple[SemanticPrototype, ...] | None = None,
 ) -> SemanticRouteResult | None:
     """Stateless routing helper; re-encodes examples on every call.

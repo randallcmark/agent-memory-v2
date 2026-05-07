@@ -1,7 +1,13 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from agent_memory_v2.aging import age_bucket, age_days, age_penalty, effective_age_days, prune_dry_run_decision
+from agent_memory_v2.aging import (
+    age_bucket,
+    age_days,
+    age_penalty,
+    effective_age_days,
+    prune_dry_run_decision,
+)
 from agent_memory_v2.config import AppConfig
 from agent_memory_v2.models import MemoryRecord
 
@@ -45,7 +51,7 @@ def make_config(tmp_path: Path) -> AppConfig:
 
 
 def test_age_days_and_bucket():
-    now_dt = datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
+    now_dt = datetime(2026, 3, 29, 12, 0, tzinfo=UTC)
     days = age_days("2026-03-28T12:00:00+00:00", now_dt=now_dt)
     assert days == 1.0
     assert age_bucket(days) == "1-7d"
@@ -78,7 +84,7 @@ def _make_record(
     )
 
 
-_NOW = datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 3, 29, 12, 0, tzinfo=UTC)
 
 
 def test_prune_dry_run_marks_stale_ephemeral_turn(tmp_path: Path):

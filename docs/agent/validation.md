@@ -39,10 +39,17 @@ OPENAI_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --prov
 OPENAI_API_KEY=... make agent-eval-all ARGS="--provider openai --record-history --save-all"
 ```
 
+Manual Anthropic validation when credentials are available:
+
+```sh
+ANTHROPIC_API_KEY=... make agent-eval-run ARGS="--scenario preference_recall --provider anthropic --save-all"
+ANTHROPIC_API_KEY=... make agent-eval-all ARGS="--provider anthropic --record-history --save-all"
+```
+
 ## Validation Standard
 
 - Run the narrowest relevant tests during implementation.
 - Run `make test` and `make eval-all` before completion when feasible.
 - Use fake providers for CI-safe agent harness checks.
-- Do not require OpenAI credentials or Ollama for deterministic CI.
+- Do not require OpenAI, Anthropic, or Ollama credentials for deterministic CI.
 - If validation cannot run, report why and record persistent gaps in `docs/quality/technical-debt.md`.

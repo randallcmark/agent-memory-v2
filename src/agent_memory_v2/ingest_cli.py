@@ -1,3 +1,5 @@
+"""CLI for ingesting a user/agent turn into the memory store."""
+
 from __future__ import annotations
 
 import argparse

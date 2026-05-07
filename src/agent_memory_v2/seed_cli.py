@@ -1,3 +1,5 @@
+"""Seed CLI: bulk-ingests turns from a JSONL seed file to pre-populate the memory store."""
+
 from __future__ import annotations
 
 import argparse

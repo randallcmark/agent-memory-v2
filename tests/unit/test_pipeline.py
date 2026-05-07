@@ -1,85 +1,30 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
-import pytest
-from datetime import datetime, timedelta, timezone
+from conftest import (
+    QueueExtractionOllama,
+    StubEncoder,
+    StubExtractionOllama,
+    StubOllama,
+    make_config,
+)
 
+from agent_memory_v2.aging import parse_timestamp
 from agent_memory_v2.classifier import classify_text, detect_task_resolution
-from agent_memory_v2.config import AppConfig
 from agent_memory_v2.embeddings import HashEmbeddingEncoder
 from agent_memory_v2.models import Message
 from agent_memory_v2.pipeline import (
     MemoryPipeline,
-    _apply_char_budget,
-    _build_temporal_context,
-    _clean_memory_text,
-    _format_recalled_item,
-    _parse_timestamp,
-    _recency_bonus,
-    _relative_time_label,
-    _resolve_timezone,
+    apply_char_budget,
+    build_temporal_context,
+    clean_memory_text,
+    format_recalled_item,
+    recency_bonus,
+    relative_time_label,
+    resolve_timezone,
     run_ollama_preflight,
 )
-
-
-class StubEncoder:
-    def encode(self, text: str) -> np.ndarray:
-        if "milk" in text.lower():
-            return np.array([1.0, 0.0, 0.0], dtype="float32")
-        return np.array([0.0, 1.0, 0.0], dtype="float32")
-
-
-class StubOllama:
-    def generate(self, prompt: str) -> str:
-        return "stub-response"
-
-
-class StubExtractionOllama:
-    def __init__(self, response: str) -> None:
-        self.response = response
-
-    def generate(self, prompt: str) -> str:
-        return self.response
-
-
-class QueueExtractionOllama:
-    def __init__(self, responses: list[str]) -> None:
-        self.responses = list(responses)
-
-    def generate(self, prompt: str) -> str:
-        del prompt
-        if not self.responses:
-            raise AssertionError("No queued extraction response")
-        return self.responses.pop(0)
-
-
-def make_config(tmp_path: Path) -> AppConfig:
-    return AppConfig(
-        root_dir=tmp_path,
-        settings_path=tmp_path / "settings.yaml",
-        raw={
-            "llm": {
-                "host": "http://localhost:11434",
-                "model": "llama3:8b",
-                "temperature": 0.2,
-                "max_tokens": 100,
-                "timeout_seconds": 10,
-            },
-            "embeddings": {"model": "all-MiniLM-L6-v2"},
-            "memory": {
-                "embedding_dim": 3,
-                "top_k": 3,
-                "similarity_threshold": 0.2,
-                "index_path": "data/memory/test.index",
-                "metadata_path": "data/memory/test.json",
-                "interaction_log_path": "data/logs/interactions.jsonl",
-            },
-            "prompting": {
-                "memory_heading": "Relevant memory",
-                "input_heading": "Current user input",
-            },
-        },
-    )
 
 
 def test_pipeline_prefers_embedding_dimension_over_memory_dimension(tmp_path: Path):
@@ -157,13 +102,13 @@ def test_build_prompt_includes_recalled_memory(tmp_path: Path):
 
 def test_clean_memory_text_removes_response_boilerplate():
     raw = "Your response:\n\nI've taken note of your preference."
-    cleaned = _clean_memory_text(raw)
+    cleaned = clean_memory_text(raw)
     assert "Your response:" not in cleaned
     assert cleaned == "I've taken note of your preference."
 
 
 def test_format_recalled_item_keeps_score_and_cleaned_text():
-    rendered = _format_recalled_item(
+    rendered = format_recalled_item(
         {
             "role": "turn",
             "text": "User: prefer oat milk\nAgent: Your response:\n\nNoted.",
@@ -545,7 +490,7 @@ def test_build_temporal_context_includes_absolute_and_relative_dates(tmp_path: P
     config.raw["app"] = {"timezone": "Europe/London"}
     config.raw["prompting"]["inject_now"] = True
     config.raw["prompting"]["temporal_context"] = {"enabled": True}
-    context = _build_temporal_context(config)
+    context = build_temporal_context(config)
     assert "As of now:" in context
     assert "Absolute timestamp:" in context
     assert "Day frame of reference:" in context
@@ -563,22 +508,22 @@ def test_build_prompt_includes_negative_sentiment_guidance(tmp_path: Path):
 
 
 def test_parse_timestamp_handles_z_suffix():
-    parsed = _parse_timestamp("2026-03-29T07:00:00Z")
+    parsed = parse_timestamp("2026-03-29T07:00:00Z")
     assert parsed is not None
     assert parsed.tzinfo is not None
 
 
 def test_relative_time_label_yesterday():
-    tz = timezone.utc
-    now_dt = datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
+    tz = UTC
+    now_dt = datetime(2026, 3, 29, 12, 0, tzinfo=UTC)
     past_dt = now_dt - timedelta(days=1)
-    assert _relative_time_label(past_dt, now_dt, tz) == "yesterday"
+    assert relative_time_label(past_dt, now_dt, tz) == "yesterday"
 
 
 def test_recency_bonus_prefers_fresher_memory():
-    now_dt = datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
-    fresh = _recency_bonus("2026-03-29T10:00:00+00:00", now_dt)
-    stale = _recency_bonus("2026-01-29T10:00:00+00:00", now_dt)
+    now_dt = datetime(2026, 3, 29, 12, 0, tzinfo=UTC)
+    fresh = recency_bonus("2026-03-29T10:00:00+00:00", now_dt)
+    stale = recency_bonus("2026-01-29T10:00:00+00:00", now_dt)
     assert fresh > stale
 
 
@@ -1366,7 +1311,7 @@ def _item(text: str) -> dict:
 def test_apply_char_budget_within_budget_unchanged():
     factual = [_item("hello")]
     contextual = [_item("world")]
-    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=200)
+    out_f, out_c, applied = apply_char_budget(factual, contextual, budget=200)
     assert out_f == factual
     assert out_c == contextual
     assert applied is False
@@ -1375,7 +1320,7 @@ def test_apply_char_budget_within_budget_unchanged():
 def test_apply_char_budget_drops_contextual_when_exceeded():
     factual = [_item("A" * 100)]
     contextual = [_item("B" * 100)]
-    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=150)
+    out_f, out_c, applied = apply_char_budget(factual, contextual, budget=150)
     assert len(out_f) == 1
     assert out_c == []
     assert applied is True
@@ -1384,7 +1329,7 @@ def test_apply_char_budget_drops_contextual_when_exceeded():
 def test_apply_char_budget_drops_factual_when_first_item_exceeds():
     factual = [_item("A" * 200), _item("B" * 10)]
     contextual = [_item("C" * 10)]
-    out_f, out_c, applied = _apply_char_budget(factual, contextual, budget=150)
+    out_f, out_c, applied = apply_char_budget(factual, contextual, budget=150)
     assert len(out_f) == 1
     assert out_f[0]["text"] == "A" * 200
     assert out_c == []
@@ -1393,7 +1338,7 @@ def test_apply_char_budget_drops_factual_when_first_item_exceeds():
 
 def test_apply_char_budget_zero_disables():
     factual = [_item("A" * 5000)]
-    out_f, out_c, applied = _apply_char_budget(factual, [], budget=0)
+    out_f, out_c, applied = apply_char_budget(factual, [], budget=0)
     assert out_f == factual
     assert applied is False
 
@@ -1403,7 +1348,7 @@ def test_apply_char_budget_zero_disables():
 def test_resolve_timezone_falls_back_to_config(tmp_path: Path):
     config = make_config(tmp_path)
     config.raw["app"] = {"timezone": "Europe/London"}
-    tz = _resolve_timezone(config, profile=None)
+    tz = resolve_timezone(config, profile=None)
     assert str(tz) == "Europe/London"
 
 
@@ -1411,7 +1356,7 @@ def test_resolve_timezone_prefers_profile_over_config(tmp_path: Path):
     config = make_config(tmp_path)
     config.raw["app"] = {"timezone": "Europe/London"}
     profile = {"preferences": {"preference.timezone": {"value": "America/New_York"}}}
-    tz = _resolve_timezone(config, profile=profile)
+    tz = resolve_timezone(config, profile=profile)
     assert str(tz) == "America/New_York"
 
 
@@ -1419,7 +1364,7 @@ def test_resolve_timezone_falls_back_when_profile_tz_invalid(tmp_path: Path):
     config = make_config(tmp_path)
     config.raw["app"] = {"timezone": "Europe/London"}
     profile = {"preferences": {"preference.timezone": {"value": "Not/ATimezone"}}}
-    tz = _resolve_timezone(config, profile=profile)
+    tz = resolve_timezone(config, profile=profile)
     assert str(tz) == "Europe/London"
 
 
