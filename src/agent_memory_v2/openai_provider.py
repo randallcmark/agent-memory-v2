@@ -24,7 +24,7 @@ class OpenAIProvider:
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         if not self.api_key:
             raise RuntimeError("OPENAI_API_KEY is required for OpenAI agent eval runs")
-        self.model_name = model or os.environ.get("AGENT_MEMORY_V2_OPENAI_MODEL", "gpt-5.1")
+        self.model_name = model or os.environ.get("AGENT_MEMORY_V2_OPENAI_MODEL", "gpt-4o")
         self.base_url = (base_url or os.environ.get("AGENT_MEMORY_V2_OPENAI_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
         self.timeout_seconds = timeout_seconds
 

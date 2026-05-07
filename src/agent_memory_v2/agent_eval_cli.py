@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_memory_v2.agent_eval import FakeAgentProvider, run_agent_scenario
+from agent_memory_v2.claude_provider import ClaudeProvider
 from agent_memory_v2.config import AppConfig, load_config
 from agent_memory_v2.eval_history import (
     compare_summaries,
@@ -43,6 +44,8 @@ def _build_provider(name: str, scenario: dict[str, Any], *, fake_mode: str = "no
         return FakeAgentProvider(scenario, mode=fake_mode)
     if name == "openai":
         return OpenAIProvider()
+    if name == "claude":
+        return ClaudeProvider()
     raise RuntimeError(f"Unsupported provider: {name}")
 
 
@@ -91,7 +94,7 @@ def main() -> None:
 
     run_cmd = subparsers.add_parser("run")
     run_cmd.add_argument("--scenario", required=True)
-    run_cmd.add_argument("--provider", choices=["fake", "openai"], default="fake")
+    run_cmd.add_argument("--provider", choices=["fake", "openai", "claude"], default="fake")
     run_cmd.add_argument("--dataset", default="evals/scenarios.json")
     run_cmd.add_argument("--artifact-dir", default="artifacts/agent_eval")
     run_cmd.add_argument("--save-all", action="store_true")
@@ -101,7 +104,7 @@ def main() -> None:
     run_cmd.add_argument("--fake-mode", choices=["normal", "invalid", "evolve", "loop"], default="normal")
 
     run_all_cmd = subparsers.add_parser("run-all")
-    run_all_cmd.add_argument("--provider", choices=["fake", "openai"], default="fake")
+    run_all_cmd.add_argument("--provider", choices=["fake", "openai", "claude"], default="fake")
     run_all_cmd.add_argument("--dataset", default="evals/scenarios.json")
     run_all_cmd.add_argument("--artifact-dir", default="artifacts/agent_eval")
     run_all_cmd.add_argument("--save-all", action="store_true")
