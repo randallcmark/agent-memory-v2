@@ -15,9 +15,13 @@ bash scripts/validate-harness.sh
 Core regression suite:
 
 ```sh
+python -m ruff check src/ tests/
+python -m ruff format --check src/ tests/
 make test
 make eval-all
 ```
+
+These Ruff commands intentionally use the pinned project version, `ruff==0.15.12`.
 
 Live model validation when Ollama is available:
 

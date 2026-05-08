@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agent_memory_v2.scenario_cli import _compare_runs, _load_scenarios
+from agent_memory_v2.scenario_cli import compare_runs, load_scenarios
 
 
 def test_load_scenarios_returns_named_entries(tmp_path: Path) -> None:
@@ -12,12 +12,12 @@ def test_load_scenarios_returns_named_entries(tmp_path: Path) -> None:
         json.dumps({"scenarios": [{"name": "example", "query": "Hello", "setup_turns": []}]}),
         encoding="utf-8",
     )
-    scenarios = _load_scenarios(dataset)
+    scenarios = load_scenarios(dataset)
     assert scenarios[0]["name"] == "example"
 
 
 def test_compare_runs_reports_prompt_and_response_differences() -> None:
-    comparison = _compare_runs(
+    comparison = compare_runs(
         {
             "scenario": {"name": "a"},
             "artifact_dir": "/tmp/a",

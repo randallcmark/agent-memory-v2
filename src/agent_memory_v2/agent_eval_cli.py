@@ -20,11 +20,11 @@ from agent_memory_v2.eval_history import (
     write_history,
 )
 from agent_memory_v2.openai_provider import OpenAIProvider
-from agent_memory_v2.scenario_cli import _load_scenarios
+from agent_memory_v2.scenario_cli import load_scenarios
 
 
 def _find_scenario(path: Path, name: str) -> dict[str, Any]:
-    for scenario in _load_scenarios(path):
+    for scenario in load_scenarios(path):
         if scenario.get("name") == name:
             return scenario
     raise RuntimeError(f"Unknown scenario: {name}")
@@ -62,7 +62,9 @@ def _run_one(
     max_tool_calls: int,
 ) -> dict[str, Any]:
     provider = _build_provider(provider_name, scenario, fake_mode=fake_mode)
-    with tempfile.TemporaryDirectory(prefix=f"agent-memory-v2-agent-eval-{provider_name}-") as temp_dir:
+    with tempfile.TemporaryDirectory(
+        prefix=f"agent-memory-v2-agent-eval-{provider_name}-"
+    ) as temp_dir:
         result = run_agent_scenario(
             base_config=base_config,
             scenario=scenario,
@@ -96,24 +98,32 @@ def main() -> None:
 
     run_cmd = subparsers.add_parser("run")
     run_cmd.add_argument("--scenario", required=True)
-    run_cmd.add_argument("--provider", choices=["fake", "openai", "anthropic", "claude"], default="fake")
+    run_cmd.add_argument(
+        "--provider", choices=["fake", "openai", "anthropic", "claude"], default="fake"
+    )
     run_cmd.add_argument("--dataset", default="evals/scenarios.json")
     run_cmd.add_argument("--artifact-dir", default="artifacts/agent_eval")
     run_cmd.add_argument("--save-all", action="store_true")
     run_cmd.add_argument("--record-history", action="store_true")
     run_cmd.add_argument("--history-dir", default="artifacts/eval_history/agent_eval")
     run_cmd.add_argument("--max-tool-calls", type=int, default=5)
-    run_cmd.add_argument("--fake-mode", choices=["normal", "invalid", "evolve", "loop"], default="normal")
+    run_cmd.add_argument(
+        "--fake-mode", choices=["normal", "invalid", "evolve", "loop"], default="normal"
+    )
 
     run_all_cmd = subparsers.add_parser("run-all")
-    run_all_cmd.add_argument("--provider", choices=["fake", "openai", "anthropic", "claude"], default="fake")
+    run_all_cmd.add_argument(
+        "--provider", choices=["fake", "openai", "anthropic", "claude"], default="fake"
+    )
     run_all_cmd.add_argument("--dataset", default="evals/scenarios.json")
     run_all_cmd.add_argument("--artifact-dir", default="artifacts/agent_eval")
     run_all_cmd.add_argument("--save-all", action="store_true")
     run_all_cmd.add_argument("--record-history", action="store_true")
     run_all_cmd.add_argument("--history-dir", default="artifacts/eval_history/agent_eval")
     run_all_cmd.add_argument("--max-tool-calls", type=int, default=5)
-    run_all_cmd.add_argument("--fake-mode", choices=["normal", "invalid", "evolve", "loop"], default="normal")
+    run_all_cmd.add_argument(
+        "--fake-mode", choices=["normal", "invalid", "evolve", "loop"], default="normal"
+    )
 
     history_cmd = subparsers.add_parser("history")
     history_cmd.add_argument("--history-dir", default="artifacts/eval_history/agent_eval")
@@ -123,7 +133,9 @@ def main() -> None:
 
     args = parser.parse_args()
     base_config = load_config()
-    history_root = base_config.root_dir / getattr(args, "history_dir", "artifacts/eval_history/agent_eval")
+    history_root = base_config.root_dir / getattr(
+        args, "history_dir", "artifacts/eval_history/agent_eval"
+    )
 
     if args.command == "history":
         print(json.dumps({"history": load_history(history_root)}, indent=2))
@@ -146,7 +158,7 @@ def main() -> None:
     if args.command == "run":
         scenarios = [_find_scenario(dataset_path, args.scenario)]
     else:
-        scenarios = _load_scenarios(dataset_path)
+        scenarios = load_scenarios(dataset_path)
 
     results = [
         _run_one(

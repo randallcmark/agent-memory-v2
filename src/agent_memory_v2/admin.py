@@ -112,7 +112,10 @@ def _sidecar_vector_text(record: MemoryRecord) -> str:
 
 
 def _should_run_semantic_router(metadata: dict) -> bool:
-    return not metadata.get("durable", False) and metadata.get("memory_class") in {"turn", "message"}
+    return not metadata.get("durable", False) and metadata.get("memory_class") in {
+        "turn",
+        "message",
+    }
 
 
 def _build_extractor_generator(config: AppConfig) -> OllamaClient:
@@ -226,7 +229,9 @@ def get_store_stats(config: AppConfig) -> dict:
             "enabled": bool(config.sidecar.get("enabled", False)),
             "count": len(sidecar_store.records) if sidecar_store is not None else 0,
             "index_path": str(sidecar_store.index_path) if sidecar_store is not None else None,
-            "metadata_path": str(sidecar_store.metadata_path) if sidecar_store is not None else None,
+            "metadata_path": str(sidecar_store.metadata_path)
+            if sidecar_store is not None
+            else None,
         },
         "profile": {
             "enabled": bool(config.profile.get("enabled", False)),
@@ -252,7 +257,9 @@ def get_aging_report(config: AppConfig) -> dict:
         bucket_counts[bucket] = bucket_counts.get(bucket, 0) + 1
         memory_class = record.metadata.get("memory_class", record.role)
         class_bucket_counts.setdefault(memory_class, {})
-        class_bucket_counts[memory_class][bucket] = class_bucket_counts[memory_class].get(bucket, 0) + 1
+        class_bucket_counts[memory_class][bucket] = (
+            class_bucket_counts[memory_class].get(bucket, 0) + 1
+        )
 
     sidecar_bucket_counts: dict[str, int] = {}
     sidecar_groups: dict[str, int] = {}
@@ -268,7 +275,9 @@ def get_aging_report(config: AppConfig) -> dict:
         "bucket_counts": bucket_counts,
         "class_bucket_counts": class_bucket_counts,
         "sidecar_bucket_counts": sidecar_bucket_counts,
-        "sidecar_superseded_groups": {key: count for key, count in sidecar_groups.items() if count > 1},
+        "sidecar_superseded_groups": {
+            key: count for key, count in sidecar_groups.items() if count > 1
+        },
         "policy": config.aging,
     }
 
@@ -286,7 +295,9 @@ def _task_prune_decisions(records: list[MemoryRecord], config: AppConfig) -> dic
         if memory_class != "task":
             continue
         age = age_days(record.timestamp, now_dt=now_dt)
-        normalized = normalize_task_value(record.metadata.get("extracted_value") or record.summary or record.text)
+        normalized = normalize_task_value(
+            record.metadata.get("extracted_value") or record.summary or record.text
+        )
         resolved_ts = resolved_values.get(normalized)
         if resolved_ts:
             resolved_age = age_days(resolved_ts, now_dt=now_dt)
@@ -442,7 +453,11 @@ def prune_sidecar_store(config: AppConfig) -> dict:
             "sidecar_enabled": True,
             "archive_path": str(
                 config.resolve_path(
-                    str((config.aging.get("sidecar", {}) or {}).get("archive_path", "data/archive/pruned_sidecar.jsonl"))
+                    str(
+                        (config.aging.get("sidecar", {}) or {}).get(
+                            "archive_path", "data/archive/pruned_sidecar.jsonl"
+                        )
+                    )
                 )
             ),
         }
@@ -450,7 +465,11 @@ def prune_sidecar_store(config: AppConfig) -> dict:
     kept_records = [record for record in sidecar_store.records if record.memory_id not in prune_ids]
     pruned_records = [record for record in sidecar_store.records if record.memory_id in prune_ids]
     archive_path = config.resolve_path(
-        str((config.aging.get("sidecar", {}) or {}).get("archive_path", "data/archive/pruned_sidecar.jsonl"))
+        str(
+            (config.aging.get("sidecar", {}) or {}).get(
+                "archive_path", "data/archive/pruned_sidecar.jsonl"
+            )
+        )
     )
     archive_path.parent.mkdir(parents=True, exist_ok=True)
     with archive_path.open("a", encoding="utf-8") as handle:
@@ -485,9 +504,7 @@ def prune_store(config: AppConfig) -> dict:
     store = _build_store(config)
     decisions = _prune_decision_payload(config)
     prune_ids = {
-        item["memory_id"]
-        for item in decisions["candidates"]
-        if item["decision"] == "prune"
+        item["memory_id"] for item in decisions["candidates"] if item["decision"] == "prune"
     }
     if not prune_ids:
         return {
@@ -511,7 +528,11 @@ def prune_store(config: AppConfig) -> dict:
     )
 
     archive_path = config.resolve_path(
-        str((config.aging.get("prune", {}) or {}).get("archive_path", "data/archive/pruned_memories.jsonl"))
+        str(
+            (config.aging.get("prune", {}) or {}).get(
+                "archive_path", "data/archive/pruned_memories.jsonl"
+            )
+        )
     )
     archive_path.parent.mkdir(parents=True, exist_ok=True)
     with archive_path.open("a", encoding="utf-8") as handle:
@@ -646,7 +667,9 @@ def reset_store(config: AppConfig) -> dict:
         "metadata_path": str(store.metadata_path),
         "interaction_log_path": str(interaction_log),
         "sidecar_index_path": str(sidecar_store.index_path) if sidecar_store is not None else None,
-        "sidecar_metadata_path": str(sidecar_store.metadata_path) if sidecar_store is not None else None,
+        "sidecar_metadata_path": str(sidecar_store.metadata_path)
+        if sidecar_store is not None
+        else None,
         "profile_path": str(profile_store.path) if profile_store is not None else None,
     }
 
@@ -704,7 +727,10 @@ def rebuild_store(config: AppConfig) -> dict:
                 store.add(record, vector)
                 if sidecar_store is not None:
                     allowed = set(config.sidecar.get("store_classes", ["preference", "fact"]))
-                    if record.metadata.get("durable", False) and record.metadata.get("memory_class") in allowed:
+                    if (
+                        record.metadata.get("durable", False)
+                        and record.metadata.get("memory_class") in allowed
+                    ):
                         sidecar_record = _build_sidecar_record(record)
                         sidecar_store.add(
                             sidecar_record,
@@ -721,7 +747,9 @@ def rebuild_store(config: AppConfig) -> dict:
         "index_path": str(store.index_path),
         "metadata_path": str(store.metadata_path),
         "sidecar_index_path": str(sidecar_store.index_path) if sidecar_store is not None else None,
-        "sidecar_metadata_path": str(sidecar_store.metadata_path) if sidecar_store is not None else None,
+        "sidecar_metadata_path": str(sidecar_store.metadata_path)
+        if sidecar_store is not None
+        else None,
         "profile_path": str(profile_store.path) if profile_store is not None else None,
     }
 
@@ -789,7 +817,10 @@ def inspect_archive(config: AppConfig) -> dict:
 
     return {
         "main_archive": {"path": str(main_path), **_summarise(_read_archive_records(main_path))},
-        "sidecar_archive": {"path": str(sidecar_path), **_summarise(_read_archive_records(sidecar_path))},
+        "sidecar_archive": {
+            "path": str(sidecar_path),
+            **_summarise(_read_archive_records(sidecar_path)),
+        },
     }
 
 
@@ -818,7 +849,12 @@ def restore_from_archive(
         store = _build_store(config)
 
     if store is None:
-        return {"error": "store not available", "restored": 0, "skipped_duplicate": 0, "skipped_filter": 0}
+        return {
+            "error": "store not available",
+            "restored": 0,
+            "skipped_duplicate": 0,
+            "skipped_filter": 0,
+        }
 
     encoder = build_encoder(
         provider=config.embeddings.get("provider", "hash"),
@@ -835,7 +871,12 @@ def restore_from_archive(
         try:
             since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
         except ValueError:
-            return {"error": f"Invalid --since date: {since}", "restored": 0, "skipped_duplicate": 0, "skipped_filter": 0}
+            return {
+                "error": f"Invalid --since date: {since}",
+                "restored": 0,
+                "skipped_duplicate": 0,
+                "skipped_filter": 0,
+            }
 
     existing_ids = {r.memory_id for r in store.records}
     raw_records = _read_archive_records(archive_path)
@@ -850,7 +891,10 @@ def restore_from_archive(
         if memory_id and record.memory_id != memory_id:
             skipped_filter += 1
             continue
-        if memory_class and (raw.get("metadata") or {}).get("memory_class", record.role) != memory_class:
+        if (
+            memory_class
+            and (raw.get("metadata") or {}).get("memory_class", record.role) != memory_class
+        ):
             skipped_filter += 1
             continue
         if since_dt:
@@ -1028,8 +1072,13 @@ def main() -> int:
 
     if args.command == "check-schema":
         from agent_memory_v2.models import SCHEMA_VERSION
+
         store = _build_store(config)
-        stale = [r.memory_id for r in store.records if r.metadata.get("schema_version", 0) != SCHEMA_VERSION]
+        stale = [
+            r.memory_id
+            for r in store.records
+            if r.metadata.get("schema_version", 0) != SCHEMA_VERSION
+        ]
         payload = {
             "current_schema_version": SCHEMA_VERSION,
             "total_records": len(store.records),

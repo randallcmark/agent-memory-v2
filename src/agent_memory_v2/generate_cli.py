@@ -12,7 +12,9 @@ from agent_memory_v2.ollama import OllamaClient, OllamaProfile
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Send an exact prompt to Ollama and return the raw response.")
+    parser = argparse.ArgumentParser(
+        description="Send an exact prompt to Ollama and return the raw response."
+    )
     parser.add_argument("--prompt", default=None)
     parser.add_argument("--prompt-file", default=None)
     parser.add_argument("--host", default=None)
@@ -37,10 +39,16 @@ def main() -> int:
         OllamaProfile(
             host=args.host or llm_cfg["host"],
             model=args.model or llm_cfg["model"],
-            temperature=float(args.temperature if args.temperature is not None else llm_cfg["temperature"]),
-            max_tokens=int(args.max_tokens if args.max_tokens is not None else llm_cfg["max_tokens"]),
+            temperature=float(
+                args.temperature if args.temperature is not None else llm_cfg["temperature"]
+            ),
+            max_tokens=int(
+                args.max_tokens if args.max_tokens is not None else llm_cfg["max_tokens"]
+            ),
             timeout_seconds=int(
-                args.timeout_seconds if args.timeout_seconds is not None else llm_cfg["timeout_seconds"]
+                args.timeout_seconds
+                if args.timeout_seconds is not None
+                else llm_cfg["timeout_seconds"]
             ),
         )
     )

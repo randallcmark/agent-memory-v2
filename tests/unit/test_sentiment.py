@@ -21,6 +21,7 @@ def test_detect_positive_sentiment():
 
 # ── negation suppression ──────────────────────────────────────────────────────
 
+
 def test_negation_suppresses_negative():
     result = detect_sentiment("I'm not angry at all.")
     assert result.label != "negative"
@@ -38,6 +39,7 @@ def test_negation_not_confused_by_distant_not():
 
 
 # ── expanded keyword coverage ─────────────────────────────────────────────────
+
 
 def test_new_negative_keyword_sad():
     result = detect_sentiment("I feel really sad today.")

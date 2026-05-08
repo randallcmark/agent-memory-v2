@@ -132,11 +132,7 @@ def clean_memory_text(text: str) -> str:
 
 def resolve_timezone(config: AppConfig, profile: dict | None = None):
     if profile is not None:
-        tz_pref = (
-            profile.get("preferences", {})
-            .get("preference.timezone", {})
-            .get("value")
-        )
+        tz_pref = profile.get("preferences", {}).get("preference.timezone", {}).get("value")
         if tz_pref:
             try:
                 return ZoneInfo(str(tz_pref))
@@ -149,7 +145,6 @@ def resolve_timezone(config: AppConfig, profile: dict | None = None):
         except (ValueError, KeyError):
             pass
     return datetime.now().astimezone().tzinfo
-
 
 
 def relative_time_label(past_dt: datetime, now_dt: datetime, tz) -> str:
@@ -307,7 +302,9 @@ def apply_char_budget(
     return out_factual, out_contextual, False
 
 
-def _contextual_prompt_filter(items: list[dict], *, allow_empty: bool = False) -> tuple[list[dict], list[dict]]:
+def _contextual_prompt_filter(
+    items: list[dict], *, allow_empty: bool = False
+) -> tuple[list[dict], list[dict]]:
     kept: list[dict] = []
     dropped: list[dict] = []
     for item in items:
@@ -354,7 +351,11 @@ def build_temporal_context(config: AppConfig, profile: dict | None = None) -> st
 
 def _format_profile(profile: dict) -> str:
     lines: list[str] = []
-    for section_name, label in (("preferences", "Preferences"), ("facts", "Facts"), ("tasks", "Tasks")):
+    for section_name, label in (
+        ("preferences", "Preferences"),
+        ("facts", "Facts"),
+        ("tasks", "Tasks"),
+    ):
         items = profile.get(section_name) or {}
         if not items:
             continue
@@ -529,7 +530,9 @@ class MemoryPipeline:
             metadata["classification_source"] = "structured_extractor"
         return metadata
 
-    def _memory_classification_metadata(self, text: str, classification: ClassificationResult) -> dict:
+    def _memory_classification_metadata(
+        self, text: str, classification: ClassificationResult
+    ) -> dict:
         metadata = _classification_metadata(classification)
         metadata["classification_source"] = "rule"
         route = self._semantic_candidate(text, classification)
@@ -545,6 +548,7 @@ class MemoryPipeline:
     def _taxonomy_version() -> int:
         try:
             from agent_memory_v2.taxonomy import get_taxonomy
+
             return get_taxonomy().version
         except (ImportError, AttributeError):
             return 0
@@ -563,7 +567,11 @@ class MemoryPipeline:
         embed_text: str | None = None,
     ) -> MemoryRecord:
         vector = self.encoder.encode(embed_text if embed_text is not None else summary)
-        metadata = {**metadata, "schema_version": SCHEMA_VERSION, "taxonomy_version": self._taxonomy_version()}
+        metadata = {
+            **metadata,
+            "schema_version": SCHEMA_VERSION,
+            "taxonomy_version": self._taxonomy_version(),
+        }
         record = MemoryRecord(
             memory_id=message_id,
             role=role,
@@ -667,19 +675,19 @@ class MemoryPipeline:
             threshold=float(router_cfg.get("threshold", 0.72)),
         )
 
-    def _query_intent_bonus(
-        self, item, query_route: SemanticRouteResult | None
-    ) -> float:
-        if query_route is None or not query_route.above_threshold or not query_route.durable_candidate:
+    def _query_intent_bonus(self, item, query_route: SemanticRouteResult | None) -> float:
+        if (
+            query_route is None
+            or not query_route.above_threshold
+            or not query_route.durable_candidate
+        ):
             return 0.0
         record_profile_key = item.record.metadata.get("profile_key")
         if record_profile_key and record_profile_key == query_route.candidate_key:
             return 0.04
         return 0.0
 
-    def _sidecar_query_texts(
-        self, text: str, query_route: SemanticRouteResult | None
-    ) -> list[str]:
+    def _sidecar_query_texts(self, text: str, query_route: SemanticRouteResult | None) -> list[str]:
         texts: list[str] = []
         raw = str(text or "").strip()
         normalized = _normalize_embedding_text(raw)
@@ -700,7 +708,9 @@ class MemoryPipeline:
             unique.append(item)
         return unique
 
-    def _rank_key(self, item, query_route: SemanticRouteResult | None = None) -> tuple[float, float]:
+    def _rank_key(
+        self, item, query_route: SemanticRouteResult | None = None
+    ) -> tuple[float, float]:
         rank_score = (
             float(item.score)
             + class_priority(item.record.metadata.get("memory_class", item.record.role))
@@ -724,7 +734,9 @@ class MemoryPipeline:
             "text": item.record.text,
             "timestamp": item.record.timestamp,
             "message_id": item.record.message_id,
-            "source_message_id": item.record.metadata.get("source_memory_id", item.record.message_id),
+            "source_message_id": item.record.metadata.get(
+                "source_memory_id", item.record.message_id
+            ),
             "memory_class": item.record.metadata.get("memory_class", item.record.role),
             "extracted_value": item.record.metadata.get("extracted_value"),
             "profile_key": item.record.metadata.get("profile_key"),
@@ -797,14 +809,20 @@ class MemoryPipeline:
 
         sections: list[str] = []
         if factual:
-            factual_lines = [format_recalled_item(item, self.config, profile_for_tz) for item in factual]
+            factual_lines = [
+                format_recalled_item(item, self.config, profile_for_tz) for item in factual
+            ]
             sections.append("Relevant durable facts:\n" + "\n".join(factual_lines))
         if contextual:
-            context_lines = [format_recalled_item(item, self.config, profile_for_tz) for item in contextual]
+            context_lines = [
+                format_recalled_item(item, self.config, profile_for_tz) for item in contextual
+            ]
             sections.append("Relevant conversation context:\n" + "\n".join(context_lines))
         if not sections:
             fallback_heading = (
-                "Additional recalled memory" if profile_block else self.config.prompting["memory_heading"]
+                "Additional recalled memory"
+                if profile_block
+                else self.config.prompting["memory_heading"]
             )
             sections.append(f"{fallback_heading}:\n- none")
         memory_block = "\n\n".join(sections)
@@ -871,7 +889,9 @@ def main() -> None:
     from uuid import uuid4
 
     parser = argparse.ArgumentParser(description="Interactive chat CLI for agent_memory_v2.")
-    parser.add_argument("--user", default=None, help="User/profile to target. Defaults to catchall.")
+    parser.add_argument(
+        "--user", default=None, help="User/profile to target. Defaults to catchall."
+    )
     args = parser.parse_args()
     if args.user:
         os.environ["AGENT_MEMORY_V2_USER"] = args.user

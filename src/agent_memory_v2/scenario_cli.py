@@ -16,7 +16,7 @@ from agent_memory_v2.pipeline import MemoryPipeline, run_ollama_preflight
 from agent_memory_v2.sentiment import detect_sentiment
 
 
-def _load_scenarios(path: Path) -> list[dict[str, Any]]:
+def load_scenarios(path: Path) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
     scenarios = data.get("scenarios", [])
@@ -26,7 +26,7 @@ def _load_scenarios(path: Path) -> list[dict[str, Any]]:
 
 
 def _find_scenario(path: Path, name: str) -> dict[str, Any]:
-    for scenario in _load_scenarios(path):
+    for scenario in load_scenarios(path):
         if scenario.get("name") == name:
             return scenario
     raise RuntimeError(f"Unknown scenario: {name}")
@@ -137,7 +137,7 @@ def _load_run(path_or_id: str, artifact_base: Path) -> dict[str, Any]:
     return data
 
 
-def _compare_runs(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+def compare_runs(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     return {
         "scenario_a": a["scenario"]["name"],
         "scenario_b": b["scenario"]["name"],
@@ -156,7 +156,9 @@ def _compare_runs(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Qualitative scenario workflow for agent_memory_v2.")
+    parser = argparse.ArgumentParser(
+        description="Qualitative scenario workflow for agent_memory_v2."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     list_cmd = subparsers.add_parser("list")
@@ -181,7 +183,7 @@ def main() -> None:
     config = load_config()
 
     if args.command == "list":
-        scenarios = _load_scenarios(config.root_dir / args.dataset)
+        scenarios = load_scenarios(config.root_dir / args.dataset)
         print(json.dumps({"scenarios": scenarios}, indent=2))
         raise SystemExit(0)
 
@@ -194,7 +196,7 @@ def main() -> None:
     if args.command == "compare":
         run_a = _load_run(args.run_a, artifact_base)
         run_b = _load_run(args.run_b, artifact_base)
-        print(json.dumps({"comparison": _compare_runs(run_a, run_b)}, indent=2))
+        print(json.dumps({"comparison": compare_runs(run_a, run_b)}, indent=2))
         raise SystemExit(0)
 
     if not args.skip_preflight:

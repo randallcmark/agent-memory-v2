@@ -75,7 +75,9 @@ def main() -> int:
                 extractor_cfg = config.structured_extractor
                 if not extractor_cfg.get("enabled", False):
                     payload["structured_extraction"] = None
-                    payload["structured_extraction_skipped_reason"] = "structured_extractor_disabled"
+                    payload["structured_extraction_skipped_reason"] = (
+                        "structured_extractor_disabled"
+                    )
                 elif route is None or not route.above_threshold or not route.durable_candidate:
                     payload["structured_extraction"] = None
                     payload["structured_extraction_skipped_reason"] = (

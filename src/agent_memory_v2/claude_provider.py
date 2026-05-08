@@ -9,7 +9,7 @@ from typing import Any
 import requests
 
 from agent_memory_v2.agent_eval import AgentProviderResponse, AgentToolCall
-from agent_memory_v2.ollama import _with_retry
+from agent_memory_v2.ollama import with_retry
 
 
 class ClaudeProvider:
@@ -63,7 +63,7 @@ class ClaudeProvider:
                 raise RuntimeError("Claude returned a non-object response")
             return data
 
-        return _with_retry(_call)
+        return with_retry(_call)
 
     @staticmethod
     def _convert_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -99,7 +99,9 @@ class ClaudeProvider:
                     fc = input_items[i]
                     raw_args = fc.get("arguments") or "{}"
                     try:
-                        input_data = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
+                        input_data = (
+                            json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
+                        )
                     except (ValueError, TypeError):
                         input_data = {}
                     tool_uses.append(
@@ -186,7 +188,9 @@ class ClaudeProvider:
             }
             for call in tool_calls
         ]
-        text_parts = [block["text"] for block in content if block.get("type") == "text" and block.get("text")]
+        text_parts = [
+            block["text"] for block in content if block.get("type") == "text" and block.get("text")
+        ]
         output_text = " ".join(text_parts) if text_parts else None
         return AgentProviderResponse(
             tool_calls=tool_calls,

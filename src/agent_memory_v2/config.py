@@ -58,7 +58,9 @@ class AppConfig:
 
     @property
     def current_user(self) -> str:
-        selected = os.environ.get("AGENT_MEMORY_V2_USER") or self.user.get("current_profile") or "catchall"
+        selected = (
+            os.environ.get("AGENT_MEMORY_V2_USER") or self.user.get("current_profile") or "catchall"
+        )
         normalized = re.sub(r"[^a-zA-Z0-9._-]+", "-", str(selected).strip()).strip("-._")
         return normalized or "catchall"
 
@@ -75,14 +77,20 @@ class AppConfig:
 
     def resolve_path(self, value: str) -> Path:
         rendered = str(value).format(user_id=self.current_user)
-        if "{user_id}" not in str(value) and self.current_user != "catchall" and rendered.startswith("data/"):
+        if (
+            "{user_id}" not in str(value)
+            and self.current_user != "catchall"
+            and rendered.startswith("data/")
+        ):
             rendered = f"data/users/{self.current_user}/{rendered.removeprefix('data/')}"
         return (self.root_dir / rendered).resolve()
 
 
 def load_config(settings_path: str | Path | None = None) -> AppConfig:
     package_dir = Path(__file__).resolve().parents[2]
-    resolved_settings = Path(settings_path) if settings_path else package_dir / "config/settings.yaml"
+    resolved_settings = (
+        Path(settings_path) if settings_path else package_dir / "config/settings.yaml"
+    )
     with resolved_settings.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle)
     if not isinstance(raw, dict):

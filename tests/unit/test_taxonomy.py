@@ -135,7 +135,9 @@ def test_expected_key_present(taxonomy: Taxonomy, key: str) -> None:
 def test_key_mode(taxonomy: Taxonomy, key: str, expected_mode: str) -> None:
     tk = taxonomy.get(key)
     assert tk is not None
-    assert tk.mode == expected_mode, f"Key '{key}': expected mode '{expected_mode}', got '{tk.mode}'"
+    assert tk.mode == expected_mode, (
+        f"Key '{key}': expected mode '{expected_mode}', got '{tk.mode}'"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +207,9 @@ def test_to_prototypes_excludes_keys_without_examples(taxonomy: Taxonomy) -> Non
     proto_keys = {p.candidate_key for p in protos}
     for tk in taxonomy.keys:
         if not tk.examples:
-            assert tk.key not in proto_keys, f"Key '{tk.key}' has no examples but appears in prototypes"
+            assert tk.key not in proto_keys, (
+                f"Key '{tk.key}' has no examples but appears in prototypes"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +227,7 @@ def test_get_taxonomy_explicit_path_bypasses_cache(tmp_path: Path) -> None:
     import shutil
 
     import agent_memory_v2.taxonomy as _tax_mod
+
     src = Path(__file__).resolve().parents[2] / "config" / "taxonomy.yaml"
     dst = tmp_path / "taxonomy.yaml"
     shutil.copy(src, dst)

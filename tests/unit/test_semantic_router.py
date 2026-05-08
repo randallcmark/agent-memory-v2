@@ -20,7 +20,9 @@ def test_semantic_router_detects_location_candidate(encoder: HashEmbeddingEncode
 
 
 def test_semantic_router_detects_location_correction_candidate(encoder: HashEmbeddingEncoder):
-    result = route_semantic_candidate("Actually, I am based in Glasgow now.", encoder, threshold=0.72)
+    result = route_semantic_candidate(
+        "Actually, I am based in Glasgow now.", encoder, threshold=0.72
+    )
 
     assert result is not None
     assert result.candidate_key == "identity.location"
@@ -30,7 +32,9 @@ def test_semantic_router_detects_location_correction_candidate(encoder: HashEmbe
 
 
 def test_semantic_router_detects_contextual_world_fact(encoder: HashEmbeddingEncoder):
-    result = route_semantic_candidate("The Meadows has cherry blossom trees.", encoder, threshold=0.72)
+    result = route_semantic_candidate(
+        "The Meadows has cherry blossom trees.", encoder, threshold=0.72
+    )
 
     assert result is not None
     assert result.candidate_key == "contextual.world_fact"

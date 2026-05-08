@@ -23,8 +23,8 @@ class TaxonomyKey:
     key: str
     tier1: str
     tier2: str
-    mode: str          # scalar | additive | task
-    cls: str           # fact | preference | task | context | ephemeral
+    mode: str  # scalar | additive | task
+    cls: str  # fact | preference | task | context | ephemeral
     durable: bool
     description: str
     examples: tuple[str, ...]
@@ -62,6 +62,7 @@ class Taxonomy:
 
     def to_prototypes(self) -> tuple:
         from agent_memory_v2.semantic_router import SemanticPrototype
+
         protos = []
         for tk in self.keys:
             if not tk.examples:

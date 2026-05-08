@@ -40,7 +40,9 @@ def sanitise_repo(*, apply_changes: bool) -> dict:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Sanitise the repo for publication by removing runtime state.")
+    parser = argparse.ArgumentParser(
+        description="Sanitise the repo for publication by removing runtime state."
+    )
     parser.add_argument("--apply", action="store_true")
     return parser
 

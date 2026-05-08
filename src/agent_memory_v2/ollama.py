@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["OllamaProfile", "OllamaClient"]
+__all__ = ["OllamaProfile", "OllamaClient", "with_retry"]
 
 import time
 from collections.abc import Callable
@@ -22,7 +22,7 @@ class OllamaProfile:
     raw_prompt: bool = False
 
 
-def _with_retry[T](
+def with_retry[T](
     fn: Callable[[], T],
     *,
     max_attempts: int = 3,
@@ -35,14 +35,14 @@ def _with_retry[T](
         except (requests.ConnectionError, requests.Timeout):
             if attempt == max_attempts - 1:
                 raise
-            time.sleep(base_delay * (2 ** attempt))
+            time.sleep(base_delay * (2**attempt))
         except requests.HTTPError as exc:
             if exc.response is not None and exc.response.status_code < 500:
                 raise
             if attempt == max_attempts - 1:
                 raise
-            time.sleep(base_delay * (2 ** attempt))
-    raise RuntimeError("_with_retry: unreachable")  # pragma: no cover
+            time.sleep(base_delay * (2**attempt))
+    raise RuntimeError("with_retry: unreachable")  # pragma: no cover
 
 
 class OllamaClient:
@@ -86,7 +86,9 @@ class OllamaClient:
         return expected.split(":")[0] == actual.split(":")[0]
 
     def model_exists(self) -> bool:
-        return any(self._model_name_matches(self.profile.model, model) for model in self.list_models())
+        return any(
+            self._model_name_matches(self.profile.model, model) for model in self.list_models()
+        )
 
     def healthcheck(self, *, run_generate: bool = False) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -156,7 +158,7 @@ class OllamaClient:
                 raise RuntimeError("Ollama returned an empty response")
             return text
 
-        return _with_retry(_call)
+        return with_retry(_call)
 
     def embed(self, text: str) -> list[float]:
         def _call() -> list[float]:
@@ -174,4 +176,4 @@ class OllamaClient:
                 raise RuntimeError("Ollama returned an empty embedding vector")
             return vector
 
-        return _with_retry(_call)
+        return with_retry(_call)

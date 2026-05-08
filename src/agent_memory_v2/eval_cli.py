@@ -95,7 +95,13 @@ def eval_classification(dataset: dict) -> dict:
             },
             "expected": expected,
         }
-        for field in ("memory_class", "extracted_value", "durable", "durability_reason", "profile_key"):
+        for field in (
+            "memory_class",
+            "extracted_value",
+            "durable",
+            "durability_reason",
+            "profile_key",
+        ):
             if field in expected and getattr(actual, field) != expected[field]:
                 passed = False
         results.append(_pass_fail(case["name"], passed, detail))
@@ -137,7 +143,12 @@ def eval_semantic(dataset: dict) -> dict:
         actual = route.to_metadata() if route is not None else None
         passed = actual is not None
         if actual is not None:
-            for field in ("candidate_key", "candidate_class", "above_threshold", "durable_candidate"):
+            for field in (
+                "candidate_key",
+                "candidate_class",
+                "above_threshold",
+                "durable_candidate",
+            ):
                 if field in expected and actual.get(field) != expected[field]:
                     passed = False
         results.append(
@@ -195,15 +206,23 @@ def eval_recall(dataset: dict, base_config: AppConfig) -> dict:
             recall = pipeline.merged_recall(query)
             expected = case["expected"]
             factual_text = " ".join(item["text"] for item in recall["factual"])
-            top_merged_profile_key = recall["merged"][0]["profile_key"] if recall["merged"] else None
+            top_merged_profile_key = (
+                recall["merged"][0]["profile_key"] if recall["merged"] else None
+            )
 
             passed = True
             for snippet in expected.get("factual_contains", []):
                 if snippet not in factual_text:
                     passed = False
-            if "contextual_count_at_least" in expected and recall["contextual_count"] < expected["contextual_count_at_least"]:
+            if (
+                "contextual_count_at_least" in expected
+                and recall["contextual_count"] < expected["contextual_count_at_least"]
+            ):
                 passed = False
-            if "top_merged_profile_key" in expected and top_merged_profile_key != expected["top_merged_profile_key"]:
+            if (
+                "top_merged_profile_key" in expected
+                and top_merged_profile_key != expected["top_merged_profile_key"]
+            ):
                 passed = False
 
             results.append(
@@ -240,7 +259,9 @@ def eval_prompt(dataset: dict, base_config: AppConfig) -> dict:
                 passed = False
             if len(prompt_context["contextual"]) < expected.get("contextual_count_at_least", 0):
                 passed = False
-            if len(prompt_context["dropped_contextual"]) < expected.get("dropped_contextual_count_at_least", 0):
+            if len(prompt_context["dropped_contextual"]) < expected.get(
+                "dropped_contextual_count_at_least", 0
+            ):
                 passed = False
             results.append(
                 _pass_fail(
@@ -314,7 +335,9 @@ def main() -> None:
         default="artifacts/eval_history/deterministic",
         help="Directory for compact eval history summaries.",
     )
-    parser.add_argument("--record-history", action="store_true", help="Persist a compact history summary.")
+    parser.add_argument(
+        "--record-history", action="store_true", help="Persist a compact history summary."
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON only.")
     args = parser.parse_args()
 

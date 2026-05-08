@@ -52,7 +52,10 @@ def make_config(tmp_path: Path) -> AppConfig:
                 "store_classes": ["preference", "fact"],
             },
             "profile": {"enabled": True, "path": "data/profile/user_profile.json", "inject": True},
-            "prompting": {"memory_heading": "Relevant memory", "input_heading": "Current user input"},
+            "prompting": {
+                "memory_heading": "Relevant memory",
+                "input_heading": "Current user input",
+            },
         },
     )
 

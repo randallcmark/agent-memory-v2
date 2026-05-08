@@ -8,7 +8,19 @@ import re
 from dataclasses import dataclass
 
 _NEGATION_WORDS = frozenset(
-    ["not", "never", "no", "don't", "dont", "didn't", "didnt", "wouldn't", "wouldnt", "shouldn't", "shouldnt"]
+    [
+        "not",
+        "never",
+        "no",
+        "don't",
+        "dont",
+        "didn't",
+        "didnt",
+        "wouldn't",
+        "wouldnt",
+        "shouldn't",
+        "shouldnt",
+    ]
 )
 
 
@@ -21,7 +33,9 @@ class SentimentResult:
 
 
 _POSITIVE_PATTERNS = [
-    re.compile(r"\b(thanks|thank you|great|awesome|excellent|love|perfect|amazing)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(thanks|thank you|great|awesome|excellent|love|perfect|amazing)\b", re.IGNORECASE
+    ),
 ]
 
 _NEGATIVE_PATTERNS = [

@@ -90,7 +90,15 @@ def test_build_prompt_includes_recalled_memory(tmp_path: Path):
     )
     prompt = pipeline.build_prompt(
         Message(role="user", text="What did I ask before?"),
-        [{"role": "user", "text": "remember milk", "score": 0.99, "timestamp": "x", "message_id": "m1"}],
+        [
+            {
+                "role": "user",
+                "text": "remember milk",
+                "score": 0.99,
+                "timestamp": "x",
+                "message_id": "m1",
+            }
+        ],
     )
     assert "remember milk" in prompt
     assert "What did I ask before?" in prompt
@@ -114,8 +122,7 @@ def test_format_recalled_item_keeps_score_and_cleaned_text():
             "text": "User: prefer oat milk\nAgent: Your response:\n\nNoted.",
             "score": 0.42,
             "timestamp": "2026-03-29T07:00:00+00:00",
-        }
-        ,
+        },
         make_config(Path("/tmp")),
     )
     assert rendered.startswith("- [turn] ")
@@ -502,7 +509,9 @@ def test_build_prompt_includes_negative_sentiment_guidance(tmp_path: Path):
         encoder=StubEncoder(),
         ollama=StubOllama(),
     )
-    prompt = pipeline.build_prompt(Message(role="user", text="I am really frustrated with this bug."), [])
+    prompt = pipeline.build_prompt(
+        Message(role="user", text="I am really frustrated with this bug."), []
+    )
     assert "Detected user sentiment: negative" in prompt
     assert "avoid sounding defensive" in prompt
 
@@ -600,7 +609,9 @@ def test_recall_prioritizes_classified_memory_when_scores_are_close(tmp_path: Pa
         Message(role="agent", text="small talk reply", turn_id="t-turn"),
     )
 
-    recalled = pipeline.recall(Message(role="user", text="What do I prefer? oat milk?", message_id="new-id"))
+    recalled = pipeline.recall(
+        Message(role="user", text="What do I prefer? oat milk?", message_id="new-id")
+    )
     assert recalled[0]["memory_class"] == "preference"
     assert recalled[0]["extracted_value"] == "oat milk"
 
@@ -674,9 +685,7 @@ def test_sidecar_embeddings_use_canonical_durable_value_on_ingest(tmp_path: Path
         Message(role="agent", text="Noted.", turn_id="semantic-turn"),
     )
 
-    recalled = pipeline.recall(
-        Message(role="user", text="Edinburgh", message_id="new-id")
-    )
+    recalled = pipeline.recall(Message(role="user", text="Edinburgh", message_id="new-id"))
 
     assert recalled[0]["store_kind"] == "sidecar_memory"
     assert recalled[0]["text"] == "Edinburgh"
@@ -806,7 +815,9 @@ def test_structured_extractor_rejection_keeps_semantic_candidate_nondurable(tmp_
     assert stored.metadata["memory_class"] == "turn"
     assert stored.metadata["durable"] is False
     assert stored.metadata["structured_extraction"]["accepted"] is False
-    assert stored.metadata["structured_extraction"]["rejection_reason"] == "below_confidence_threshold"
+    assert (
+        stored.metadata["structured_extraction"]["rejection_reason"] == "below_confidence_threshold"
+    )
     assert pipeline.sidecar_store is not None
     assert pipeline.sidecar_store.records == []
 
@@ -955,7 +966,9 @@ def test_recall_uses_recency_when_scores_and_classes_are_close(tmp_path: Path):
         ),
     )
 
-    recalled = pipeline.recall(Message(role="user", text="What drink do I like?", message_id="new-id"))
+    recalled = pipeline.recall(
+        Message(role="user", text="What drink do I like?", message_id="new-id")
+    )
     assert recalled[0]["extracted_value"] == "coffee"
     assert recalled[0]["recency_bonus"] >= recalled[1]["recency_bonus"]
 
@@ -1186,9 +1199,15 @@ def test_query_intent_bonus_returns_zero_when_route_is_none(tmp_path: Path):
 
     pipeline = MemoryPipeline(make_config(tmp_path), encoder=StubEncoder(), ollama=StubOllama())
     record = MemoryRecord(
-        memory_id="m1", role="fact", text="Edinburgh", summary="Edinburgh",
-        timestamp="2026-01-01T00:00:00+00:00", conversation_id="c", turn_id="t",
-        message_id="m1", metadata={"profile_key": "identity.location"},
+        memory_id="m1",
+        role="fact",
+        text="Edinburgh",
+        summary="Edinburgh",
+        timestamp="2026-01-01T00:00:00+00:00",
+        conversation_id="c",
+        turn_id="t",
+        message_id="m1",
+        metadata={"profile_key": "identity.location"},
     )
     item = RecallResult(record=record, score=0.8)
 
@@ -1201,15 +1220,26 @@ def test_query_intent_bonus_returns_zero_when_profile_key_does_not_match(tmp_pat
 
     pipeline = MemoryPipeline(make_config(tmp_path), encoder=StubEncoder(), ollama=StubOllama())
     record = MemoryRecord(
-        memory_id="m1", role="fact", text="Mark", summary="Mark",
-        timestamp="2026-01-01T00:00:00+00:00", conversation_id="c", turn_id="t",
-        message_id="m1", metadata={"profile_key": "identity.name"},
+        memory_id="m1",
+        role="fact",
+        text="Mark",
+        summary="Mark",
+        timestamp="2026-01-01T00:00:00+00:00",
+        conversation_id="c",
+        turn_id="t",
+        message_id="m1",
+        metadata={"profile_key": "identity.name"},
     )
     item = RecallResult(record=record, score=0.8)
     route = SemanticRouteResult(
-        candidate_key="identity.location", candidate_class="fact",
-        description="location", score=0.9, threshold=0.72,
-        above_threshold=True, durable_candidate=True, matched_example="I live in Edinburgh.",
+        candidate_key="identity.location",
+        candidate_class="fact",
+        description="location",
+        score=0.9,
+        threshold=0.72,
+        above_threshold=True,
+        durable_candidate=True,
+        matched_example="I live in Edinburgh.",
     )
 
     assert pipeline._query_intent_bonus(item, route) == 0.0
@@ -1221,15 +1251,26 @@ def test_query_intent_bonus_returns_nonzero_when_profile_key_matches(tmp_path: P
 
     pipeline = MemoryPipeline(make_config(tmp_path), encoder=StubEncoder(), ollama=StubOllama())
     record = MemoryRecord(
-        memory_id="m1", role="fact", text="Edinburgh", summary="Edinburgh",
-        timestamp="2026-01-01T00:00:00+00:00", conversation_id="c", turn_id="t",
-        message_id="m1", metadata={"profile_key": "identity.location", "durable": True},
+        memory_id="m1",
+        role="fact",
+        text="Edinburgh",
+        summary="Edinburgh",
+        timestamp="2026-01-01T00:00:00+00:00",
+        conversation_id="c",
+        turn_id="t",
+        message_id="m1",
+        metadata={"profile_key": "identity.location", "durable": True},
     )
     item = RecallResult(record=record, score=0.8)
     route = SemanticRouteResult(
-        candidate_key="identity.location", candidate_class="fact",
-        description="location", score=0.9, threshold=0.72,
-        above_threshold=True, durable_candidate=True, matched_example="I live in Edinburgh.",
+        candidate_key="identity.location",
+        candidate_class="fact",
+        description="location",
+        score=0.9,
+        threshold=0.72,
+        above_threshold=True,
+        durable_candidate=True,
+        matched_example="I live in Edinburgh.",
     )
 
     bonus = pipeline._query_intent_bonus(item, route)
@@ -1243,15 +1284,26 @@ def test_query_intent_bonus_zero_when_route_below_threshold(tmp_path: Path):
 
     pipeline = MemoryPipeline(make_config(tmp_path), encoder=StubEncoder(), ollama=StubOllama())
     record = MemoryRecord(
-        memory_id="m1", role="fact", text="Edinburgh", summary="Edinburgh",
-        timestamp="2026-01-01T00:00:00+00:00", conversation_id="c", turn_id="t",
-        message_id="m1", metadata={"profile_key": "identity.location"},
+        memory_id="m1",
+        role="fact",
+        text="Edinburgh",
+        summary="Edinburgh",
+        timestamp="2026-01-01T00:00:00+00:00",
+        conversation_id="c",
+        turn_id="t",
+        message_id="m1",
+        metadata={"profile_key": "identity.location"},
     )
     item = RecallResult(record=record, score=0.8)
     route = SemanticRouteResult(
-        candidate_key="identity.location", candidate_class="fact",
-        description="location", score=0.5, threshold=0.72,
-        above_threshold=False, durable_candidate=True, matched_example="I live in Edinburgh.",
+        candidate_key="identity.location",
+        candidate_class="fact",
+        description="location",
+        score=0.5,
+        threshold=0.72,
+        above_threshold=False,
+        durable_candidate=True,
+        matched_example="I live in Edinburgh.",
     )
 
     assert pipeline._query_intent_bonus(item, route) == 0.0
@@ -1345,6 +1397,7 @@ def test_apply_char_budget_zero_disables():
 
 # ── W7: timezone from profile ─────────────────────────────────────────────────
 
+
 def test_resolve_timezone_falls_back_to_config(tmp_path: Path):
     config = make_config(tmp_path)
     config.raw["app"] = {"timezone": "Europe/London"}
@@ -1370,13 +1423,16 @@ def test_resolve_timezone_falls_back_when_profile_tz_invalid(tmp_path: Path):
 
 # ── W2: Ollama graceful degradation ──────────────────────────────────────────
 
+
 class FailingOllama:
     def generate(self, prompt: str) -> str:
         import requests
+
         raise requests.ConnectionError("Ollama is down")
 
     def embed(self, text: str) -> list[float]:
         import requests
+
         raise requests.ConnectionError("Ollama is down")
 
 
@@ -1393,6 +1449,7 @@ def test_respond_returns_fallback_on_ollama_failure(tmp_path: Path):
 
 def test_structured_extraction_metadata_returns_empty_on_ollama_failure(tmp_path: Path):
     from agent_memory_v2.semantic_router import SemanticRouteResult
+
     config = make_config(tmp_path)
     config.raw.setdefault("structured_extractor", {})["enabled"] = True
     pipeline = MemoryPipeline(

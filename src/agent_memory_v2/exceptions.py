@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+__all__ = [
+    "AgentMemoryError",
+    "MemoryStoreError",
+    "EmbeddingError",
+    "ConfigError",
+    "TaxonomyError",
+]
+
 
 class AgentMemoryError(Exception):
     """Base exception for all agent_memory_v2 errors."""

@@ -4,9 +4,9 @@ These rules apply to all changes in this repository. They are the agent-facing c
 
 ## Enforcement
 
-`python -m ruff check src/ tests/` must pass before any work is complete. The rule set is `["E", "W", "F", "I", "UP", "B", "SIM"]` with `E501` and `B008` ignored. Run `ruff check --fix` to auto-fix what ruff can.
+Ruff 0.15.12 is the repository lint and format contract. `python -m ruff check src/ tests/` and `python -m ruff format --check src/ tests/` must pass before any work is complete. The rule set is `["E", "W", "F", "I", "UP", "B", "SIM"]` with `E501` and `B008` ignored. Run `ruff check --fix` and `ruff format` to auto-fix what ruff can.
 
-Pre-commit hooks enforce ruff lint + format on every commit if installed.
+Pre-commit hooks enforce Ruff lint + format on every commit if installed. Pull requests that do not conform to Ruff 0.15.12 fail CI.
 
 ## Module structure
 

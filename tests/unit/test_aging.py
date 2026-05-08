@@ -45,7 +45,10 @@ def make_config(tmp_path: Path) -> AppConfig:
                     "task_ttl_days": 90,
                 },
             },
-            "prompting": {"memory_heading": "Relevant memory", "input_heading": "Current user input"},
+            "prompting": {
+                "memory_heading": "Relevant memory",
+                "input_heading": "Current user input",
+            },
         },
     )
 
@@ -60,7 +63,9 @@ def test_age_days_and_bucket():
 def test_age_penalty_hits_ephemeral_more_than_durable(tmp_path: Path):
     config = make_config(tmp_path)
     ephemeral = age_penalty(memory_class="turn", durable=False, age_days_value=14.0, config=config)
-    durable = age_penalty(memory_class="preference", durable=True, age_days_value=14.0, config=config)
+    durable = age_penalty(
+        memory_class="preference", durable=True, age_days_value=14.0, config=config
+    )
     assert ephemeral < durable
     assert ephemeral < 0.0
     assert durable == 0.0
@@ -200,4 +205,3 @@ def test_prune_recall_count_guard_checked_before_age(tmp_path: Path):
     )
     decision = prune_dry_run_decision(fresh_often_recalled, config=config, now_dt=_NOW)
     assert decision["reason"] == "actively_recalled"
-

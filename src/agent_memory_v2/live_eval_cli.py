@@ -48,7 +48,9 @@ def _build_pipeline(base: AppConfig, temp_root: Path) -> MemoryPipeline:
     return MemoryPipeline(config)
 
 
-def _seed_turns(pipeline: MemoryPipeline, turns: list[dict[str, str]], conversation_id: str) -> None:
+def _seed_turns(
+    pipeline: MemoryPipeline, turns: list[dict[str, str]], conversation_id: str
+) -> None:
     for idx, turn in enumerate(turns, start=1):
         turn_id = f"{conversation_id}-turn-{idx}"
         user_message = Message(
@@ -66,19 +68,19 @@ def _seed_turns(pipeline: MemoryPipeline, turns: list[dict[str, str]], conversat
         pipeline.ingest_turn(user_message, agent_message)
 
 
-def _contains_all(response: str, snippets: list[str]) -> tuple[bool, list[str]]:
+def contains_all(response: str, snippets: list[str]) -> tuple[bool, list[str]]:
     lowered = response.lower()
     missing = [snippet for snippet in snippets if snippet.lower() not in lowered]
     return not missing, missing
 
 
-def _contains_none(response: str, snippets: list[str]) -> tuple[bool, list[str]]:
+def contains_none(response: str, snippets: list[str]) -> tuple[bool, list[str]]:
     lowered = response.lower()
     present = [snippet for snippet in snippets if snippet.lower() in lowered]
     return not present, present
 
 
-def _contains_any(response: str, snippets: list[str]) -> tuple[bool, list[str]]:
+def contains_any(response: str, snippets: list[str]) -> tuple[bool, list[str]]:
     lowered = response.lower()
     matched = [snippet for snippet in snippets if snippet.lower() in lowered]
     return bool(matched), matched
@@ -129,9 +131,11 @@ def _run_case(
         expected_not_contains = case.get("expected_not_contains", [])
         expected_any_contains = case.get("expected_any_contains", [])
 
-        contains_ok, missing = _contains_all(response, expected_contains)
-        none_ok, forbidden = _contains_none(response, expected_not_contains)
-        any_ok, matched_any = _contains_any(response, expected_any_contains) if expected_any_contains else (True, [])
+        contains_ok, missing = contains_all(response, expected_contains)
+        none_ok, forbidden = contains_none(response, expected_not_contains)
+        any_ok, matched_any = (
+            contains_any(response, expected_any_contains) if expected_any_contains else (True, [])
+        )
 
         passed = contains_ok and none_ok and any_ok
         payload = {
@@ -205,8 +209,12 @@ def eval_all(
     save_all: bool,
 ) -> dict[str, Any]:
     stages = [
-        eval_memory(dataset, base_config=base_config, artifact_root=artifact_root, save_all=save_all),
-        eval_sentiment(dataset, base_config=base_config, artifact_root=artifact_root, save_all=save_all),
+        eval_memory(
+            dataset, base_config=base_config, artifact_root=artifact_root, save_all=save_all
+        ),
+        eval_sentiment(
+            dataset, base_config=base_config, artifact_root=artifact_root, save_all=save_all
+        ),
     ]
     return {
         "passed": all(stage["passed"] for stage in stages),
@@ -250,7 +258,9 @@ def main() -> None:
             raise SystemExit(2)
 
     dataset = _load_dataset(base_config.root_dir / args.dataset)
-    artifact_root = base_config.root_dir / args.artifact_dir / datetime.now().strftime("%Y%m%d_%H%M%S")
+    artifact_root = (
+        base_config.root_dir / args.artifact_dir / datetime.now().strftime("%Y%m%d_%H%M%S")
+    )
 
     if args.stage == "memory":
         result = eval_memory(

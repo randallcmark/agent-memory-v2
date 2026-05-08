@@ -93,7 +93,8 @@ def compact_summary(
         "passed": bool(result.get("passed", False)),
         "overall_score": overall_score(result),
         "stage_scores": {
-            stage.get("stage", f"stage_{idx}"): stage_score(stage) for idx, stage in enumerate(stages)
+            stage.get("stage", f"stage_{idx}"): stage_score(stage)
+            for idx, stage in enumerate(stages)
         },
         "stages": [
             {
@@ -103,7 +104,9 @@ def compact_summary(
                 "failed_cases": stage.get("failed_cases"),
                 "total_cases": stage.get("total_cases"),
                 "failed_case_names": [
-                    item.get("name") for item in stage.get("results", []) if not item.get("passed", False)
+                    item.get("name")
+                    for item in stage.get("results", [])
+                    if not item.get("passed", False)
                 ],
             }
             for stage in stages
@@ -148,7 +151,9 @@ def compare_summaries(current: dict[str, Any], previous: dict[str, Any] | None) 
             stage: {
                 "current": score,
                 "previous": previous_stages.get(stage),
-                "delta": None if stage not in previous_stages else score - previous_stages.get(stage, 0.0),
+                "delta": None
+                if stage not in previous_stages
+                else score - previous_stages.get(stage, 0.0),
             }
             for stage, score in current_stages.items()
         },
@@ -156,7 +161,9 @@ def compare_summaries(current: dict[str, Any], previous: dict[str, Any] | None) 
     }
 
 
-def find_previous_comparable(history: list[dict[str, Any]]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+def find_previous_comparable(
+    history: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     if not history:
         return None, None
     current = history[-1]

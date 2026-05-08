@@ -26,7 +26,10 @@ def test_resolve_text_input_reads_file(tmp_path):
 
 
 def test_resolve_text_input_reads_stdin():
-    assert resolve_text_input(text=None, text_file=None, stdin=FakePipe("from-stdin\n")) == "from-stdin"
+    assert (
+        resolve_text_input(text=None, text_file=None, stdin=FakePipe("from-stdin\n"))
+        == "from-stdin"
+    )
 
 
 def test_resolve_text_input_rejects_multiple_sources(tmp_path):

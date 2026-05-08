@@ -19,7 +19,10 @@ def make_config(tmp_path: Path) -> AppConfig:
                 "metadata_path": "data/memory/test.json",
                 "interaction_log_path": "data/logs/interactions.jsonl",
             },
-            "aging": {"enabled": True, "prune": {"ephemeral_turn_ttl_days": 14, "task_ttl_days": 90}},
+            "aging": {
+                "enabled": True,
+                "prune": {"ephemeral_turn_ttl_days": 14, "task_ttl_days": 90},
+            },
             "maintenance": {
                 "enabled": True,
                 "state_path": "data/maintenance/state.json",
@@ -29,7 +32,10 @@ def make_config(tmp_path: Path) -> AppConfig:
                 "run_profile_rebuild": True,
                 "run_prune": True,
             },
-            "prompting": {"memory_heading": "Relevant memory", "input_heading": "Current user input"},
+            "prompting": {
+                "memory_heading": "Relevant memory",
+                "input_heading": "Current user input",
+            },
         },
     )
 
@@ -42,7 +48,10 @@ def test_default_state_shape():
 
 def test_mark_interaction_sets_due_after_threshold(tmp_path: Path, monkeypatch):
     config = make_config(tmp_path)
-    monkeypatch.setattr("agent_memory_v2.maintenance.prune_dry_run", lambda config, limit=1: {"summary": {"prune": 0}})
+    monkeypatch.setattr(
+        "agent_memory_v2.maintenance.prune_dry_run",
+        lambda config, limit=1: {"summary": {"prune": 0}},
+    )
     monkeypatch.setattr(
         "agent_memory_v2.maintenance.prune_sidecar_dry_run",
         lambda config, limit=1: {"summary": {"prune": 0}},
@@ -57,7 +66,10 @@ def test_mark_interaction_sets_due_after_threshold(tmp_path: Path, monkeypatch):
 def test_evaluate_due_includes_prune_candidates(tmp_path: Path, monkeypatch):
     config = make_config(tmp_path)
     state = default_state()
-    monkeypatch.setattr("agent_memory_v2.maintenance.prune_dry_run", lambda config, limit=1: {"summary": {"prune": 1}})
+    monkeypatch.setattr(
+        "agent_memory_v2.maintenance.prune_dry_run",
+        lambda config, limit=1: {"summary": {"prune": 1}},
+    )
     monkeypatch.setattr(
         "agent_memory_v2.maintenance.prune_sidecar_dry_run",
         lambda config, limit=1: {"summary": {"prune": 0}},
@@ -70,7 +82,10 @@ def test_evaluate_due_includes_prune_candidates(tmp_path: Path, monkeypatch):
 def test_evaluate_due_includes_sidecar_candidates(tmp_path: Path, monkeypatch):
     config = make_config(tmp_path)
     state = default_state()
-    monkeypatch.setattr("agent_memory_v2.maintenance.prune_dry_run", lambda config, limit=1: {"summary": {"prune": 0}})
+    monkeypatch.setattr(
+        "agent_memory_v2.maintenance.prune_dry_run",
+        lambda config, limit=1: {"summary": {"prune": 0}},
+    )
     monkeypatch.setattr(
         "agent_memory_v2.maintenance.prune_sidecar_dry_run",
         lambda config, limit=1: {"summary": {"prune": 1}},

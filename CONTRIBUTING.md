@@ -20,11 +20,13 @@ The test suite uses a deterministic hash encoder — no Ollama required. CI runs
 
 ## Linting
 
-[Ruff](https://docs.astral.sh/ruff/) is the only linter:
+[Ruff](https://docs.astral.sh/ruff/) 0.15.12 is the repository lint and format contract. The dev dependency, pre-commit hook, and CI checks are pinned to the same version so contributors see the same rule behavior locally that CI enforces.
 
 ```bash
 python -m ruff check src/ tests/
 python -m ruff check --fix src/ tests/
+python -m ruff format --check src/ tests/
+python -m ruff format src/ tests/
 ```
 
 Pre-commit will run this automatically if you install the hooks:
@@ -47,7 +49,7 @@ See `CLAUDE.md` for the full eval command reference.
 
 1. Fork the repo and create a branch from `main`.
 2. Write or update tests — the test suite must stay green.
-3. Run `python -m ruff check --fix src/ tests/` before committing.
+3. Run `python -m ruff check --fix src/ tests/` and `python -m ruff format src/ tests/` before committing.
 4. Open a pull request using the template. Include a short description of *why* the change is needed, not just what changed.
 
 ## Code style

@@ -93,7 +93,9 @@ def main() -> int:
 
     if args.command == "import":
         if not args.force:
-            print(json.dumps({"ok": False, "error": "Refusing to import without --force"}, indent=2))
+            print(
+                json.dumps({"ok": False, "error": "Refusing to import without --force"}, indent=2)
+            )
             return 2
         print(json.dumps(import_state(Path(args.input)), indent=2))
         return 0

@@ -29,27 +29,41 @@ _PREFERENCE_PATTERNS = [
     re.compile(r"\bI like\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
     re.compile(r"\bI love\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
     re.compile(r"\bI prefer\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bmy preferred\s+(?P<subject>\w+)\s+is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+    re.compile(
+        r"\bmy preferred\s+(?P<subject>\w+)\s+is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE
+    ),
     re.compile(r"\bmy favorite\s+(?P<subject>\w+)\s+is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
-    re.compile(r"\bmy favourite\s+(?P<subject>\w+)\s+is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+    re.compile(
+        r"\bmy favourite\s+(?P<subject>\w+)\s+is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE
+    ),
 ]
 
 _FALLBACK_FACT_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bI'm from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.origin"),
     (re.compile(r"\bI am from\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.origin"),
     (re.compile(r"\bmy name is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.name"),
-    (re.compile(r"\bmy birthday is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.birthday"),
+    (
+        re.compile(r"\bmy birthday is\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+        "identity.birthday",
+    ),
     (re.compile(r"\bI live in\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.location"),
     (re.compile(r"\bI work as\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.occupation"),
     (re.compile(r"\bI work at\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.employer"),
-    (re.compile(r"\bI am allergic to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.allergy"),
-    (re.compile(r"\bremember that I am\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE), "identity.general"),
+    (
+        re.compile(r"\bI am allergic to\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+        "identity.allergy",
+    ),
+    (
+        re.compile(r"\bremember that I am\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+        "identity.general",
+    ),
 ]
 
 
 def _load_fact_patterns() -> list[tuple[re.Pattern, str]]:
     try:
         from agent_memory_v2.taxonomy import get_taxonomy
+
         patterns = get_taxonomy().to_fact_patterns()
         if patterns:
             return patterns
@@ -73,7 +87,10 @@ _TASK_PATTERNS = [
 ]
 
 _TASK_RESOLUTION_PATTERNS = [
-    re.compile(r"\bI (?:already\s+)?(?:did|finished|completed|handled)\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
+    re.compile(
+        r"\bI (?:already\s+)?(?:did|finished|completed|handled)\s+(?P<value>.+?)(?:[.!?]|$)",
+        re.IGNORECASE,
+    ),
     re.compile(r"\bI (?:have\s+)?done\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
     re.compile(r"\bI took care of\s+(?P<value>.+?)(?:[.!?]|$)", re.IGNORECASE),
 ]
@@ -86,7 +103,9 @@ _DURABILITY_BONUS: float = 0.03
 _DURABILITY_PENALTY: float = -0.01
 
 _EPHEMERAL_PATTERNS = [
-    re.compile(r"^\s*(hi|hello|hey|good morning|good afternoon|good evening)\b[!. ]*$", re.IGNORECASE),
+    re.compile(
+        r"^\s*(hi|hello|hey|good morning|good afternoon|good evening)\b[!. ]*$", re.IGNORECASE
+    ),
     re.compile(r"^\s*(bye|goodbye|see you|thanks|thank you)\b[!. ]*$", re.IGNORECASE),
     re.compile(r"\bwhat day is it\b", re.IGNORECASE),
     re.compile(r"\bwhat'?s the date\b", re.IGNORECASE),

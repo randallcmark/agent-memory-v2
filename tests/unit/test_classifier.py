@@ -24,9 +24,7 @@ from agent_memory_v2.classifier import classify_text
 )
 def test_i_must_idioms_are_not_tasks(text: str) -> None:
     result = classify_text(text)
-    assert result.memory_class != "task", (
-        f"'{text}' was classified as a task but should not be"
-    )
+    assert result.memory_class != "task", f"'{text}' was classified as a task but should not be"
 
 
 @pytest.mark.parametrize(
@@ -40,9 +38,7 @@ def test_i_must_idioms_are_not_tasks(text: str) -> None:
 )
 def test_i_must_genuine_tasks_are_detected(text: str) -> None:
     result = classify_text(text)
-    assert result.memory_class == "task", (
-        f"'{text}' should be classified as a task"
-    )
+    assert result.memory_class == "task", f"'{text}' should be classified as a task"
     assert result.durable is True
 
 

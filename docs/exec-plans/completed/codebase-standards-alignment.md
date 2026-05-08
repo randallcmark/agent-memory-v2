@@ -20,15 +20,16 @@ Audit the full codebase for drift and inconsistencies accumulated across mainten
 
 ## Acceptance Criteria
 
-- [ ] `make test` passes (0 failures)
-- [ ] `make eval-all` passes (0 failures)
-- [ ] `python -m ruff check src/ tests/` reports 0 violations
-- [ ] All source modules have a one-line module docstring
-- [ ] Core modules expose `__all__`
-- [ ] No bare `except Exception: pass` without `warnings.warn()`
-- [ ] Magic numbers replaced with named constants
-- [ ] No `_`-prefixed functions imported by tests
-- [ ] GitHub contribution infrastructure in place
+- [x] `make test` passes (0 failures)
+- [x] `make eval-all` passes (0 failures)
+- [x] `python -m ruff check src/ tests/` reports 0 violations
+- [x] `python -m ruff format --check src/ tests/` reports 0 violations
+- [x] All source modules have a one-line module docstring
+- [x] Core modules expose `__all__`
+- [x] No bare `except Exception: pass` without `warnings.warn()`
+- [x] Magic numbers replaced with named constants
+- [x] No `_`-prefixed functions imported by tests
+- [x] GitHub contribution infrastructure in place
 
 All criteria met at completion.
 
@@ -38,6 +39,7 @@ All criteria met at completion.
 make test
 make eval-all
 python -m ruff check src/ tests/
+python -m ruff format --check src/ tests/
 ```
 
 ## Steps
@@ -94,3 +96,5 @@ python -m ruff check src/ tests/
 ## Progress Log
 
 - 2026-05-07: All 8 tasks completed. `make test` 243 passed, `make eval-all` all cases passed, ruff 0 violations.
+- 2026-05-08: Follow-up review cleanup aligned `ruff-format` with repository state, added Ruff lint/format checks to CI, promoted remaining tested helper imports to public names, and added missing `exceptions.__all__`.
+- 2026-05-08: Clarified that Ruff 0.15.12 is the repository lint/format contract, not a backward-compatibility minimum.

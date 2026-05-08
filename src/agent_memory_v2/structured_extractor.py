@@ -18,8 +18,7 @@ from agent_memory_v2.semantic_router import SemanticRouteResult
 
 
 class TextGenerator(Protocol):
-    def generate(self, prompt: str) -> str:
-        ...
+    def generate(self, prompt: str) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -49,7 +48,9 @@ class StructuredExtractionResult:
 
     def to_classification_result(self) -> ClassificationResult:
         if not self.accepted:
-            raise ValueError("Only accepted structured extractions can become classification results")
+            raise ValueError(
+                "Only accepted structured extractions can become classification results"
+            )
         return ClassificationResult(
             memory_class=str(self.memory_class),
             extracted_value=self.extracted_value,
@@ -154,7 +155,10 @@ def validate_structured_extraction(
         rejection_reason = "unsupported_profile_key"
     elif profile_key != route.candidate_key:
         rejection_reason = "profile_key_mismatch"
-    elif route.candidate_class in {"fact", "preference", "task"} and memory_class != route.candidate_class:
+    elif (
+        route.candidate_class in {"fact", "preference", "task"}
+        and memory_class != route.candidate_class
+    ):
         rejection_reason = "memory_class_mismatch"
     elif extracted_value is None:
         rejection_reason = "missing_or_oversized_value"
@@ -174,11 +178,15 @@ def validate_structured_extraction(
 
 def _taxonomy_profile_keys() -> set[str]:
     import warnings
+
     try:
         from agent_memory_v2.taxonomy import get_taxonomy
+
         return get_taxonomy().durable_profile_keys()
     except Exception as exc:
-        warnings.warn(f"Failed to load taxonomy profile keys, returning empty set: {exc}", stacklevel=2)
+        warnings.warn(
+            f"Failed to load taxonomy profile keys, returning empty set: {exc}", stacklevel=2
+        )
         return set()
 
 

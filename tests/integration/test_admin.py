@@ -349,7 +349,9 @@ def test_prune_dry_run_marks_expired_and_resolved_tasks(tmp_path: Path):
             turn_id="task-old",
             timestamp="2026-02-01T08:00:00+00:00",
         ),
-        Message(role="agent", text="Noted.", turn_id="task-old", timestamp="2026-02-01T08:00:01+00:00"),
+        Message(
+            role="agent", text="Noted.", turn_id="task-old", timestamp="2026-02-01T08:00:01+00:00"
+        ),
     )
     pipeline.ingest_turn(
         Message(
@@ -358,7 +360,12 @@ def test_prune_dry_run_marks_expired_and_resolved_tasks(tmp_path: Path):
             turn_id="task-resolve",
             timestamp="2026-03-20T08:00:00+00:00",
         ),
-        Message(role="agent", text="Noted.", turn_id="task-resolve", timestamp="2026-03-20T08:00:01+00:00"),
+        Message(
+            role="agent",
+            text="Noted.",
+            turn_id="task-resolve",
+            timestamp="2026-03-20T08:00:01+00:00",
+        ),
     )
     pipeline.ingest_turn(
         Message(
@@ -367,7 +374,12 @@ def test_prune_dry_run_marks_expired_and_resolved_tasks(tmp_path: Path):
             turn_id="task-resolution",
             timestamp="2026-03-29T08:00:00+00:00",
         ),
-        Message(role="agent", text="Good.", turn_id="task-resolution", timestamp="2026-03-29T08:00:01+00:00"),
+        Message(
+            role="agent",
+            text="Good.",
+            turn_id="task-resolution",
+            timestamp="2026-03-29T08:00:01+00:00",
+        ),
     )
 
     dry_run = prune_dry_run(config)
@@ -574,12 +586,26 @@ def test_sidecar_prune_keeps_latest_profile_key_value(tmp_path: Path, monkeypatc
     }
     pipeline = MemoryPipeline(config, encoder=StubEncoder(), ollama=StubOllama())
     pipeline.ingest_turn(
-        Message(role="user", text="I prefer tea.", turn_id="pref-1", timestamp="2026-03-20T08:00:00+00:00"),
-        Message(role="agent", text="Noted.", turn_id="pref-1", timestamp="2026-03-20T08:00:01+00:00"),
+        Message(
+            role="user",
+            text="I prefer tea.",
+            turn_id="pref-1",
+            timestamp="2026-03-20T08:00:00+00:00",
+        ),
+        Message(
+            role="agent", text="Noted.", turn_id="pref-1", timestamp="2026-03-20T08:00:01+00:00"
+        ),
     )
     pipeline.ingest_turn(
-        Message(role="user", text="I prefer coffee.", turn_id="pref-2", timestamp="2026-03-29T08:00:00+00:00"),
-        Message(role="agent", text="Noted.", turn_id="pref-2", timestamp="2026-03-29T08:00:01+00:00"),
+        Message(
+            role="user",
+            text="I prefer coffee.",
+            turn_id="pref-2",
+            timestamp="2026-03-29T08:00:00+00:00",
+        ),
+        Message(
+            role="agent", text="Noted.", turn_id="pref-2", timestamp="2026-03-29T08:00:01+00:00"
+        ),
     )
 
     dry_run = prune_sidecar_dry_run(config)
@@ -632,7 +658,9 @@ def test_rebuild_store_uses_canonical_sidecar_embedding_for_recall(tmp_path: Pat
         encoding="utf-8",
     )
 
-    monkeypatch.setattr("agent_memory_v2.admin.build_encoder", lambda **kwargs: CanonicalSidecarEncoder())
+    monkeypatch.setattr(
+        "agent_memory_v2.admin.build_encoder", lambda **kwargs: CanonicalSidecarEncoder()
+    )
     monkeypatch.setattr("agent_memory_v2.admin.OllamaClient", StubExtractorClient)
 
     rebuild_store(config)
@@ -642,7 +670,9 @@ def test_rebuild_store_uses_canonical_sidecar_embedding_for_recall(tmp_path: Pat
         encoder=CanonicalSidecarEncoder(),
         ollama=StubOllama(),
     )
-    recalled = pipeline.recall(Message(role="user", text="Edinburgh in the UK", message_id="new-id"))
+    recalled = pipeline.recall(
+        Message(role="user", text="Edinburgh in the UK", message_id="new-id")
+    )
 
     assert recalled[0]["store_kind"] == "sidecar_memory"
     assert recalled[0]["text"] == "Edinburgh in the UK"

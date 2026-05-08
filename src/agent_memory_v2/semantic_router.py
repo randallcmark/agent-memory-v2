@@ -57,6 +57,7 @@ class SemanticRouteResult:
 def _load_prototypes() -> tuple[SemanticPrototype, ...]:
     try:
         from agent_memory_v2.taxonomy import get_taxonomy
+
         return get_taxonomy().to_prototypes()
     except Exception as exc:
         warnings.warn(f"Failed to load taxonomy prototypes, using fallback: {exc}", stacklevel=2)

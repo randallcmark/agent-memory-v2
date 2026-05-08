@@ -79,7 +79,9 @@ def test_turn_memory_persists_across_pipeline_restart(tmp_path: Path):
     first.ingest_turn(user_message, agent_message)
 
     second = MemoryPipeline(config, encoder=StubEncoder(), ollama=StubOllama())
-    recalled = second.recall(Message(role="user", text="What do I prefer? oat milk?", message_id="new"))
+    recalled = second.recall(
+        Message(role="user", text="What do I prefer? oat milk?", message_id="new")
+    )
 
     assert len(recalled) == 1
     assert recalled[0]["memory_class"] == "preference"
@@ -98,5 +100,7 @@ def test_named_user_uses_segregated_storage(tmp_path: Path, monkeypatch):
         Message(role="agent", text="Noted.", turn_id="t-user"),
     )
 
-    assert "/data/users/mark/memory/test.index" in str(config.resolve_path(config.memory["index_path"]))
+    assert "/data/users/mark/memory/test.index" in str(
+        config.resolve_path(config.memory["index_path"])
+    )
     assert config.resolve_path(config.memory["metadata_path"]).exists()

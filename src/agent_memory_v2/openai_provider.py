@@ -9,7 +9,7 @@ from typing import Any
 import requests
 
 from agent_memory_v2.agent_eval import AgentProviderResponse, AgentToolCall
-from agent_memory_v2.ollama import _with_retry
+from agent_memory_v2.ollama import with_retry
 
 
 class OpenAIProvider:
@@ -27,7 +27,10 @@ class OpenAIProvider:
         if not self.api_key:
             raise RuntimeError("OPENAI_API_KEY is required for OpenAI agent eval runs")
         self.model_name = model or os.environ.get("AGENT_MEMORY_V2_OPENAI_MODEL", "gpt-5.1")
-        self.base_url = (base_url or os.environ.get("AGENT_MEMORY_V2_OPENAI_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
+        self.base_url = (
+            base_url
+            or os.environ.get("AGENT_MEMORY_V2_OPENAI_BASE_URL", "https://api.openai.com/v1")
+        ).rstrip("/")
         self.timeout_seconds = timeout_seconds
 
     def _post_response(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -47,7 +50,7 @@ class OpenAIProvider:
                 raise RuntimeError("OpenAI returned a non-object response")
             return data
 
-        return _with_retry(_call)
+        return with_retry(_call)
 
     @staticmethod
     def _parse_tool_calls(items: list[dict[str, Any]]) -> list[AgentToolCall]:

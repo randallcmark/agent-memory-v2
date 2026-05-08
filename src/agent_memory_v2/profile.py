@@ -23,11 +23,15 @@ def _record_sort_key(record: MemoryRecord) -> tuple[str, str]:
 def _key_mode(profile_key: str) -> str:
     try:
         from agent_memory_v2.taxonomy import get_taxonomy
+
         tk = get_taxonomy().get(profile_key)
         if tk is not None:
             return tk.mode
     except Exception as exc:
-        warnings.warn(f"Failed to resolve taxonomy mode for {profile_key!r}, defaulting to scalar: {exc}", stacklevel=2)
+        warnings.warn(
+            f"Failed to resolve taxonomy mode for {profile_key!r}, defaulting to scalar: {exc}",
+            stacklevel=2,
+        )
     return "scalar"
 
 

@@ -14,7 +14,9 @@ from agent_memory_v2.sentiment import detect_sentiment
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build the prompt for a user input without generating.")
+    parser = argparse.ArgumentParser(
+        description="Build the prompt for a user input without generating."
+    )
     parser.add_argument("--text", default=None)
     parser.add_argument("--text-file", default=None)
     parser.add_argument("--message-id", default="prompt-query")

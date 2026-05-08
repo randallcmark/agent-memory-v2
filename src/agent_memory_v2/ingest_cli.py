@@ -13,7 +13,9 @@ from agent_memory_v2.pipeline import MemoryPipeline
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Ingest a user message or turn without using chat.")
+    parser = argparse.ArgumentParser(
+        description="Ingest a user message or turn without using chat."
+    )
     parser.add_argument("--text", default=None)
     parser.add_argument("--text-file", default=None)
     parser.add_argument("--reply", default=None)

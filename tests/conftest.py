@@ -18,6 +18,7 @@ from agent_memory_v2.store import MemoryStore
 # Core object factories
 # ---------------------------------------------------------------------------
 
+
 def make_record(memory_id: str = "m1", metadata: dict | None = None) -> MemoryRecord:
     return MemoryRecord(
         memory_id=memory_id,
@@ -72,6 +73,7 @@ def make_config(tmp_path: Path) -> AppConfig:
 # ---------------------------------------------------------------------------
 # Stub collaborators used across pipeline and integration tests
 # ---------------------------------------------------------------------------
+
 
 class StubEncoder:
     """Deterministic encoder: milk-related text maps to [1,0,0], everything else [0,1,0]."""

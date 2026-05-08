@@ -41,8 +41,7 @@ class AgentProvider(Protocol):
         instructions: str,
         input_items: list[dict[str, Any]],
         tools: list[dict[str, Any]],
-    ) -> AgentProviderResponse:
-        ...
+    ) -> AgentProviderResponse: ...
 
 
 def isolated_agent_config(base: AppConfig, root_dir: Path) -> AppConfig:
@@ -72,7 +71,10 @@ def agent_tool_schemas() -> list[dict[str, Any]]:
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "memory_class": {"type": "string", "enum": ["fact", "preference", "task", "context"]},
+                    "memory_class": {
+                        "type": "string",
+                        "enum": ["fact", "preference", "task", "context"],
+                    },
                     "text": {"type": "string"},
                     "reason": {"type": "string"},
                     "profile_key": {"type": "string"},
@@ -174,7 +176,9 @@ def _class_default_profile_key(memory_class: str, text: str) -> str | None:
     return None
 
 
-def _memory_write(pipeline: MemoryPipeline, scenario_name: str, args: dict[str, Any]) -> dict[str, Any]:
+def _memory_write(
+    pipeline: MemoryPipeline, scenario_name: str, args: dict[str, Any]
+) -> dict[str, Any]:
     memory_class = str(args.get("memory_class") or "").strip()
     text = str(args.get("text") or "").strip()
     reason = str(args.get("reason") or "").strip()
@@ -185,7 +189,9 @@ def _memory_write(pipeline: MemoryPipeline, scenario_name: str, args: dict[str, 
 
     durable = memory_class in {"fact", "preference", "task"}
     extracted_value = str(args.get("extracted_value") or text).strip()
-    profile_key = str(args.get("profile_key") or "").strip() or _class_default_profile_key(memory_class, text)
+    profile_key = str(args.get("profile_key") or "").strip() or _class_default_profile_key(
+        memory_class, text
+    )
     message = Message(role="agent", text=text, conversation_id=scenario_name)
     record = pipeline._store_memory(  # noqa: SLF001 - harness tool intentionally exercises pipeline storage.
         role=memory_class,
@@ -217,7 +223,9 @@ def _memory_write(pipeline: MemoryPipeline, scenario_name: str, args: dict[str, 
     }
 
 
-def _memory_query(pipeline: MemoryPipeline, scenario_name: str, args: dict[str, Any]) -> dict[str, Any]:
+def _memory_query(
+    pipeline: MemoryPipeline, scenario_name: str, args: dict[str, Any]
+) -> dict[str, Any]:
     query = str(args.get("query") or "").strip()
     if not query:
         return {"ok": False, "error": "missing_query"}
@@ -230,7 +238,9 @@ def _memory_inspect(pipeline: MemoryPipeline) -> dict[str, Any]:
     return {
         "ok": True,
         "memory_count": len(pipeline.store.records),
-        "sidecar_count": len(pipeline.sidecar_store.records) if pipeline.sidecar_store is not None else 0,
+        "sidecar_count": len(pipeline.sidecar_store.records)
+        if pipeline.sidecar_store is not None
+        else 0,
         "profile": profile,
     }
 
@@ -248,7 +258,11 @@ def execute_tool_call(
     if call.name == "memory_inspect":
         return _memory_inspect(pipeline), None
     if call.name == "memory_evolve":
-        return {"ok": False, "error": "unsupported_tool", "message": "memory_evolve is reserved for AIPCS."}, None
+        return {
+            "ok": False,
+            "error": "unsupported_tool",
+            "message": "memory_evolve is reserved for AIPCS.",
+        }, None
     if call.name == "answer":
         response = str(call.arguments.get("response") or "").strip()
         return {"ok": bool(response), "response": response}, response or None
@@ -267,7 +281,9 @@ def _contains_none(response: str, snippets: list[str]) -> tuple[bool, list[str]]
     return not present, present
 
 
-def _score_scenario(scenario: dict[str, Any], final_answer: str | None, invalid_calls: int) -> dict[str, Any]:
+def _score_scenario(
+    scenario: dict[str, Any], final_answer: str | None, invalid_calls: int
+) -> dict[str, Any]:
     response = final_answer or ""
     expected_contains = scenario.get("expected_contains", [])
     expected_not_contains = scenario.get("expected_not_contains", [])
@@ -321,7 +337,9 @@ def run_agent_scenario(
             trace.append(step_payload)
             break
         for call in response.tool_calls:
-            tool_result, answer = execute_tool_call(pipeline, scenario_name=scenario["name"], call=call)
+            tool_result, answer = execute_tool_call(
+                pipeline, scenario_name=scenario["name"], call=call
+            )
             if not tool_result.get("ok", False) and call.name != "memory_evolve":
                 invalid_tool_calls += 1
             step_payload["tool_calls"].append(
@@ -427,7 +445,9 @@ class FakeAgentProvider:
 
     def _fake_answer(self) -> str:
         query = str(self.scenario.get("query") or "").lower()
-        setup_text = " ".join(str(turn.get("user") or "") for turn in self.scenario.get("setup_turns", []))
+        setup_text = " ".join(
+            str(turn.get("user") or "") for turn in self.scenario.get("setup_turns", [])
+        )
         if "prefer" in query and "oat milk" in setup_text.lower():
             return "You prefer oat milk."
         if "name" in query and "mark" in setup_text.lower():
