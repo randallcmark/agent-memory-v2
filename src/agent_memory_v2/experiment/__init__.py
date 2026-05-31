@@ -20,6 +20,12 @@ __all__ = [
     "TurnResult",
     "Journal",
     "build_manifest",
+    "RunSpec",
+    "run_scenario",
+    "LIFECYCLES",
+    "Scenario",
+    "load_scenarios",
+    "find_scenario",
 ]
 
 from agent_memory_v2.experiment.config import experiment_config
@@ -29,3 +35,5 @@ from agent_memory_v2.experiment.controller import (
     TurnResult,
 )
 from agent_memory_v2.experiment.journal import Journal, build_manifest
+from agent_memory_v2.experiment.runner import LIFECYCLES, RunSpec, run_scenario
+from agent_memory_v2.experiment.scenarios import Scenario, find_scenario, load_scenarios

@@ -1,0 +1,11 @@
+{
+  "description": "Minimal background persona for the seeded lifecycle. Plain user turns replayed through the Arm A controller to populate a realistic-but-small memory store. Deliberately light so it does not steer Claude's behaviour.",
+  "turns": [
+    "My name is Mark.",
+    "I live in Edinburgh.",
+    "I work as a software engineer.",
+    "I prefer concise answers.",
+    "I'm allergic to peanuts.",
+    "I usually drink oat milk in my coffee."
+  ]
+}

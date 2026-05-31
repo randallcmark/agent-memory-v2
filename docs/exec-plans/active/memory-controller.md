@@ -1,9 +1,43 @@
 # Execution Plan: agent-memory-v2 as a Claude Controller (Experiment Harness)
 
-Status: **draft / awaiting build start**
+Status: **Phases 0–4 built & verified; Phase 5 (live dry-run) pending API key**
 Owner: Mark
 Created: 2026-05-31
-Branch (proposed): `experiment/memory-controller`
+Branch: `experiment/memory-controller`
+
+## Build progress (2026-05-31)
+
+- **Phase 0 — Verify: DONE.** Findings in §12.
+- **Phase 1 — Scaffold + Arm C: DONE.** `experiment/{config,generators,journal,controller}.py`.
+- **Phase 2 — Arm A: DONE.** Neutral helper-framed injection via `render_memory_block`
+  (reuses `prompt_context`, avoids `build_prompt`'s persona/sentiment). Verified end-to-end
+  against the real Ollama-embedded pipeline.
+- **Phase 3 — Lifecycles: DONE.** `snapshots.py` + `build_snapshots.py`; `runner.py`
+  implements cold_start / seeded / specific / compiled_resumed. Cross-session resume
+  verified: Arm A's fresh session 2 recalled a fact from session 1's snapshot;
+  Arm C injected nothing.
+- **Phase 4 — Scenarios + matrix: DONE.** `cli.py` (`list`/`run`/`matrix`/`build-snapshots`),
+  `scripts/experiment.sh`, Make targets (`exp-list/exp-run/exp-matrix/exp-build-snapshots`),
+  pyproject entry `agent-memory-v2-experiment`. Initial catalog: single_fact_recall,
+  cross_session_resume, no_memory_needed (more from §9 TODO). Persona: generic_user.
+- **Tests:** `tests/unit/test_experiment_harness.py` (8, hash-embedding/offline,
+  CI-safe). Full suite green: 251 passed.
+- **Phase 5 — Live dry-run: PENDING.** Needs `ANTHROPIC_API_KEY` exported, then
+  `make exp-build-snapshots` then
+  `make exp-run ARGS="--scenario cross_session_resume --provider anthropic --arms A,C"`.
+
+### How to run
+```bash
+export ANTHROPIC_API_KEY=...                 # required for live (--provider anthropic)
+export AGENT_MEMORY_V2_PYTHON=$PWD/.venv/bin/python
+make exp-list
+make exp-build-snapshots                      # builds seeded/specific snapshot libraries
+make exp-run ARGS="--scenario cross_session_resume --provider fake --arms A,C"   # offline smoke
+make exp-matrix ARGS="--provider anthropic --iterations 5"                        # full grid, live
+```
+Outputs: `artifacts/experiments/<exp_id>/<arm>/<scenario>/<lifecycle>/iter_<n>/`
+(`journal.jsonl`, `manifest.json`, `final_memory_snapshot/`). Snapshot library:
+`experiments/snapshots/` (both gitignored as runtime state).
 
 ## 1. Goal of THIS plan
 
