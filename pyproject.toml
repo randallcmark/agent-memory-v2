@@ -45,6 +45,7 @@ agent-memory-v2-eval = "agent_memory_v2.eval_cli:main"
 agent-memory-v2-live-eval = "agent_memory_v2.live_eval_cli:main"
 agent-memory-v2-scenario = "agent_memory_v2.scenario_cli:main"
 agent-memory-v2-agent-eval = "agent_memory_v2.agent_eval_cli:main"
+agent-memory-v2-experiment = "agent_memory_v2.experiment.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

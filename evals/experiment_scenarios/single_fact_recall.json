@@ -1,0 +1,27 @@
+{
+  "name": "single_fact_recall",
+  "description": "One durable fact stated early, asked back later in the same session. Baseline both arms should handle once context is in play; discriminates only when context is dropped.",
+  "seed": null,
+  "phases": [
+    {
+      "session": "s1",
+      "turns": [
+        "My name is Mark.",
+        "By the way I work as a software engineer.",
+        "What is my name?"
+      ],
+      "snapshot_after": false
+    }
+  ],
+  "probes": [
+    {
+      "phase": "s1",
+      "turn": 2,
+      "expected_contains": ["Mark"],
+      "expected_not_contains": []
+    }
+  ],
+  "ground_truth_memories": [
+    {"key": "identity.name", "value": "Mark", "text": "My name is Mark.", "memory_class": "fact"}
+  ]
+}

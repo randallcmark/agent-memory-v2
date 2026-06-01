@@ -1,0 +1,33 @@
+{
+  "name": "cross_session_resume",
+  "description": "Fact learned in session 1; a fresh session 2 (empty in-context history) must answer from resumed memory. The headline cross-session discriminator: Arm A should recall it, Arm C cannot.",
+  "seed": null,
+  "phases": [
+    {
+      "session": "s1",
+      "turns": [
+        "I'm planning a trip and I want to remember that I'm allergic to peanuts.",
+        "Thanks for noting that."
+      ],
+      "snapshot_after": true
+    },
+    {
+      "session": "s2",
+      "turns": [
+        "Can you suggest a snack for my flight tomorrow?"
+      ],
+      "snapshot_after": false
+    }
+  ],
+  "probes": [
+    {
+      "phase": "s2",
+      "turn": 0,
+      "expected_contains": [],
+      "expected_not_contains": ["peanut"]
+    }
+  ],
+  "ground_truth_memories": [
+    {"key": "identity.allergy", "value": "peanuts", "text": "I'm allergic to peanuts.", "memory_class": "fact"}
+  ]
+}

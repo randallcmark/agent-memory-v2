@@ -1,4 +1,4 @@
-.PHONY: test check-schema smoke smoke-generate embedding-smoke install-embedding-model use-ollama-embeddings use-hash-embeddings e2e chat preflight stats list list-sidecar profile aging-report prune-dry-run prune maintain maintenance-status rebuild-profile reset rebuild doctor classify recall prompt generate ingest backup restore seed sanitize-publish eval-classification eval-semantic eval-sentiment eval-profile eval-recall eval-prompt eval-all eval-history eval-compare live-eval-memory live-eval-sentiment live-eval-all live-eval-history live-eval-compare scenario-list scenario-run scenario-show scenario-compare agent-eval-run agent-eval-all agent-eval-history agent-eval-compare
+.PHONY: test check-schema smoke smoke-generate embedding-smoke install-embedding-model use-ollama-embeddings use-hash-embeddings e2e chat preflight stats list list-sidecar profile aging-report prune-dry-run prune maintain maintenance-status rebuild-profile reset rebuild doctor classify recall prompt generate ingest backup restore seed sanitize-publish eval-classification eval-semantic eval-sentiment eval-profile eval-recall eval-prompt eval-all eval-history eval-compare live-eval-memory live-eval-sentiment live-eval-all live-eval-history live-eval-compare scenario-list scenario-run scenario-show scenario-compare agent-eval-run agent-eval-all agent-eval-history agent-eval-compare exp-list exp-run exp-matrix exp-build-snapshots
 
 test:
 	bash scripts/test.sh
@@ -164,3 +164,15 @@ agent-eval-history:
 
 agent-eval-compare:
 	bash scripts/agent-eval.sh compare $(ARGS)
+
+exp-list:
+	bash scripts/experiment.sh list $(ARGS)
+
+exp-run:
+	bash scripts/experiment.sh run $(ARGS)
+
+exp-matrix:
+	bash scripts/experiment.sh matrix $(ARGS)
+
+exp-build-snapshots:
+	bash scripts/experiment.sh build-snapshots $(ARGS)

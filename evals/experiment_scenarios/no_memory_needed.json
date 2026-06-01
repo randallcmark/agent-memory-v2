@@ -1,0 +1,26 @@
+{
+  "name": "no_memory_needed",
+  "description": "A general-knowledge question answerable without any memory, with a distracting stored fact present. Measures the cost of memory: Arm A's wasted injection tokens and any leakage of the irrelevant fact vs Arm C answering cleanly.",
+  "seed": null,
+  "phases": [
+    {
+      "session": "s1",
+      "turns": [
+        "Just so you know, my favourite colour is teal.",
+        "What is the capital of France?"
+      ],
+      "snapshot_after": false
+    }
+  ],
+  "probes": [
+    {
+      "phase": "s1",
+      "turn": 1,
+      "expected_contains": ["Paris"],
+      "expected_not_contains": ["teal"]
+    }
+  ],
+  "ground_truth_memories": [
+    {"key": "preference.general", "value": "teal", "text": "My favourite colour is teal.", "memory_class": "preference"}
+  ]
+}
