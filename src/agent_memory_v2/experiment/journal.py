@@ -84,9 +84,7 @@ class Journal:
         self.manifest_path = self.run_dir / "manifest.json"
 
     def write_manifest(self, manifest: dict[str, Any]) -> None:
-        self.manifest_path.write_text(
-            json.dumps(manifest, indent=2, default=str), encoding="utf-8"
-        )
+        self.manifest_path.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
 
     def record_turn(
         self,

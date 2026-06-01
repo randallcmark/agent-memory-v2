@@ -67,9 +67,7 @@ def run_scenario(
         load_info = snapshot_load(input_snapshot, run_root)
         snapshot_fp = {k: load_info[k] for k in ("file_count", "total_bytes", "fingerprint")}
 
-    generator = build_generator(
-        spec.generator_name, model=spec.model, temperature=spec.temperature
-    )
+    generator = build_generator(spec.generator_name, model=spec.model, temperature=spec.temperature)
     controller = MemoryController(
         base_config=base_config, root_dir=run_root, generator=generator, arm=spec.arm
     )

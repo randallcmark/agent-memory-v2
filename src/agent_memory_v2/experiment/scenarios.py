@@ -66,7 +66,7 @@ class Scenario:
 def _parse_scenario(data: dict[str, Any]) -> Scenario:
     phases = [
         Phase(
-            session=str(p.get("session") or f"s{i+1}"),
+            session=str(p.get("session") or f"s{i + 1}"),
             turns=[str(t) for t in (p.get("turns") or [])],
             snapshot_after=bool(p.get("snapshot_after", False)),
         )

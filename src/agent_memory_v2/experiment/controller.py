@@ -109,18 +109,14 @@ class MemoryController:
         self.generator = generator
         self.config = experiment_config(base_config, root_dir)
         # Arm C needs no store; build the pipeline only when memory is in play.
-        self.pipeline: MemoryPipeline | None = (
-            MemoryPipeline(self.config) if arm == "A" else None
-        )
+        self.pipeline: MemoryPipeline | None = MemoryPipeline(self.config) if arm == "A" else None
 
     # -- memory state inspection -------------------------------------------------
     def memory_state(self) -> dict[str, Any]:
         if self.pipeline is None:
             return {"main_count": 0, "sidecar_count": 0, "profile": {}}
         profile = (
-            self.pipeline.profile_store.load()
-            if self.pipeline.profile_store is not None
-            else {}
+            self.pipeline.profile_store.load() if self.pipeline.profile_store is not None else {}
         )
         return {
             "main_count": len(self.pipeline.store.records),
@@ -156,12 +152,8 @@ class MemoryController:
         session.messages.append({"role": "assistant", "content": gen.text})
 
         if self.arm == "A" and self.pipeline is not None:
-            user_msg = Message(
-                role="user", text=user_text, conversation_id=session.session_id
-            )
-            agent_msg = Message(
-                role="agent", text=gen.text, conversation_id=session.session_id
-            )
+            user_msg = Message(role="user", text=user_text, conversation_id=session.session_id)
+            agent_msg = Message(role="agent", text=gen.text, conversation_id=session.session_id)
             self.pipeline.ingest_turn(user_msg, agent_msg)
 
         result = TurnResult(

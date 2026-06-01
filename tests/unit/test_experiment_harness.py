@@ -143,9 +143,17 @@ def test_journal_writes_one_record_per_turn(hash_base_config, tmp_path):
     )
     journal = Journal(tmp_path / "run")
     manifest = build_manifest(
-        exp_id="t", arm="A", scenario="demo", lifecycle="cold_start", iteration=0,
-        config=ctrl.config, generator_name="fake", model="fake-generator",
-        temperature=0.0, snapshot=None, snapshot_fingerprint=None,
+        exp_id="t",
+        arm="A",
+        scenario="demo",
+        lifecycle="cold_start",
+        iteration=0,
+        config=ctrl.config,
+        generator_name="fake",
+        model="fake-generator",
+        temperature=0.0,
+        snapshot=None,
+        snapshot_fingerprint=None,
     )
     journal.write_manifest(manifest)
     session = Session()
@@ -186,10 +194,7 @@ def test_runner_compiled_resumed_carries_memory_across_sessions(hash_base_config
     )
     summary = run_scenario(base_config=hash_base_config, scenario=scenario, spec=spec)
     assert summary["turns_recorded"] == 2
-    records = [
-        json.loads(line)
-        for line in Path(summary["journal_path"]).read_text().splitlines()
-    ]
+    records = [json.loads(line) for line in Path(summary["journal_path"]).read_text().splitlines()]
     s2 = [r for r in records if r["phase"] == "s2"][0]
     # The fresh s2 session must have memory available from the resumed snapshot.
     assert s2["memory_state_after"]["main_count"] >= 1

@@ -49,7 +49,12 @@ def snapshot_load(snapshot: Path, root: Path) -> dict[str, Any]:
         shutil.rmtree(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(snapshot, target)
-    return {"ok": True, "snapshot": str(snapshot), "root": str(root), **snapshot_fingerprint(target)}
+    return {
+        "ok": True,
+        "snapshot": str(snapshot),
+        "root": str(root),
+        **snapshot_fingerprint(target),
+    }
 
 
 def snapshot_fingerprint(path: Path) -> dict[str, Any]:
@@ -63,9 +68,7 @@ def snapshot_fingerprint(path: Path) -> dict[str, Any]:
         for p in sorted(path.rglob("*")):
             if p.is_file():
                 files.append((str(p.relative_to(path)), p.stat().st_size))
-    digest = hashlib.sha256(
-        json.dumps(files, sort_keys=True).encode("utf-8")
-    ).hexdigest()[:16]
+    digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode("utf-8")).hexdigest()[:16]
     return {
         "file_count": len(files),
         "total_bytes": sum(size for _, size in files),

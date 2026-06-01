@@ -77,7 +77,8 @@ class FakeGenerator:
         prefix = "[memory-aware] " if saw_memory else ""
         text = f"{prefix}Acknowledged: {last_user}".strip()
         usage = {
-            "input_tokens": len(system or "") // 4 + sum(len(str(m.get("content", ""))) for m in messages) // 4,
+            "input_tokens": len(system or "") // 4
+            + sum(len(str(m.get("content", ""))) for m in messages) // 4,
             "output_tokens": len(text) // 4,
         }
         return GenResult(text=text, usage=usage, raw={"fake": True})

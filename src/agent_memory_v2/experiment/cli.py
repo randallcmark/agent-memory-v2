@@ -114,7 +114,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     snapshot_library=snapshot_library,
                 )
             )
-    print(json.dumps({"exp_id": exp_id, "cells": len(all_results), "results": all_results}, indent=2))
+    print(
+        json.dumps({"exp_id": exp_id, "cells": len(all_results), "results": all_results}, indent=2)
+    )
     return 0
 
 
@@ -149,7 +151,9 @@ def _cmd_matrix(args: argparse.Namespace) -> int:
                         snapshot_library=snapshot_library,
                     )
                 )
-    print(json.dumps({"exp_id": exp_id, "cells": len(all_results), "results": all_results}, indent=2))
+    print(
+        json.dumps({"exp_id": exp_id, "cells": len(all_results), "results": all_results}, indent=2)
+    )
     return 0
 
 
