@@ -36,6 +36,26 @@ def test_claude_provider_supports_legacy_claude_env(monkeypatch) -> None:
     assert provider.model_name == "claude-test-model"
 
 
+def test_claude_provider_sends_temperature(monkeypatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    provider = ClaudeProvider(temperature=0.0)
+    captured = {}
+
+    def fake_post(payload):
+        captured["payload"] = payload
+        return {"content": [{"type": "text", "text": "ok"}], "usage": {}}
+
+    provider._post_message = fake_post  # type: ignore[method-assign]
+
+    provider.next_response(
+        instructions="system",
+        input_items=[{"role": "user", "content": "hello"}],
+        tools=[],
+    )
+
+    assert captured["payload"]["temperature"] == 0.0
+
+
 def test_claude_tool_schema_conversion() -> None:
     tools = ClaudeProvider._convert_tools(agent_tool_schemas())
 

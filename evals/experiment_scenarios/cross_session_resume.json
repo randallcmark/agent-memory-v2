@@ -23,8 +23,8 @@
     {
       "phase": "s2",
       "turn": 0,
-      "expected_contains": [],
-      "expected_not_contains": ["peanut"]
+      "expected_contains": ["peanut"],
+      "expected_not_contains": []
     }
   ],
   "ground_truth_memories": [

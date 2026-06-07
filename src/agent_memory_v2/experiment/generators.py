@@ -35,7 +35,7 @@ class ClaudeGenerator:
         # Imported lazily so offline/fake runs don't require the API key at import.
         from agent_memory_v2.claude_provider import ClaudeProvider
 
-        self._provider = ClaudeProvider(model=model)
+        self._provider = ClaudeProvider(model=model, temperature=temperature)
         self.model = self._provider.model_name
         self.temperature = temperature
 

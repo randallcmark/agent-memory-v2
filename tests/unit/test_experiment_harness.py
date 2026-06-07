@@ -130,6 +130,7 @@ def test_manifest_records_injection_framing(hash_base_config, tmp_path):
         temperature=0.0,
         snapshot=None,
         snapshot_fingerprint=None,
+        repo_root=hash_base_config.root_dir,
     )
     # Section 5 audit trail must be present and verifiable.
     assert MEMORY_BLOCK_HEADING in manifest["injection_framing"]
@@ -154,6 +155,7 @@ def test_journal_writes_one_record_per_turn(hash_base_config, tmp_path):
         temperature=0.0,
         snapshot=None,
         snapshot_fingerprint=None,
+        repo_root=hash_base_config.root_dir,
     )
     journal.write_manifest(manifest)
     session = Session()
@@ -165,7 +167,17 @@ def test_journal_writes_one_record_per_turn(hash_base_config, tmp_path):
     lines = (tmp_path / "run" / "journal.jsonl").read_text().splitlines()
     assert len(lines) == 2
     rec = json.loads(lines[0])
-    assert {"user_text", "response", "usage", "memory_state_after", "scenario_meta"} <= rec.keys()
+    assert {
+        "user_text",
+        "response",
+        "usage",
+        "memory_state_after",
+        "scenario_meta",
+        "messages_sent",
+        "final_prompt",
+        "persisted_memory",
+    } <= rec.keys()
+    assert rec["persisted_memory"]["metadata"]["kind"] == "turn_memory"
 
 
 def test_runner_compiled_resumed_carries_memory_across_sessions(hash_base_config, tmp_path):

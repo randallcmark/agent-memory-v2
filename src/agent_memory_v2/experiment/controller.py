@@ -15,7 +15,7 @@ may use if relevant. Claude's own system behaviour is otherwise left untouched.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -47,8 +47,10 @@ class TurnResult:
     user_text: str
     response: str
     system_prompt: str
+    messages_sent: list[dict[str, str]]
     injected_context: str | None
     recalled_items: list[dict[str, Any]]
+    persisted_memory: dict[str, Any] | None
     usage: dict[str, Any]
     duration_ms: float
     memory_state_after: dict[str, Any]
@@ -145,16 +147,19 @@ class MemoryController:
 
         session.messages.append({"role": "user", "content": user_text})
 
+        messages_sent = [dict(m) for m in session.messages]
+
         start = time.perf_counter()
-        gen = self.generator.generate(system=system, messages=session.messages)
+        gen = self.generator.generate(system=system, messages=messages_sent)
         duration_ms = round((time.perf_counter() - start) * 1000, 3)
 
         session.messages.append({"role": "assistant", "content": gen.text})
 
+        persisted_memory: dict[str, Any] | None = None
         if self.arm == "A" and self.pipeline is not None:
             user_msg = Message(role="user", text=user_text, conversation_id=session.session_id)
             agent_msg = Message(role="agent", text=gen.text, conversation_id=session.session_id)
-            self.pipeline.ingest_turn(user_msg, agent_msg)
+            persisted_memory = asdict(self.pipeline.ingest_turn(user_msg, agent_msg))
 
         result = TurnResult(
             arm=self.arm,
@@ -162,8 +167,10 @@ class MemoryController:
             user_text=user_text,
             response=gen.text,
             system_prompt=system,
+            messages_sent=messages_sent,
             injected_context=injected_context,
             recalled_items=recalled,
+            persisted_memory=persisted_memory,
             usage=dict(gen.usage),
             duration_ms=duration_ms,
             memory_state_after=self.memory_state(),

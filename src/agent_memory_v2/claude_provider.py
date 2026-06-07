@@ -24,6 +24,7 @@ class ClaudeProvider:
         provider_name: str | None = None,
         timeout_seconds: int = 120,
         max_tokens: int = 4096,
+        temperature: float | None = None,
     ) -> None:
         if provider_name:
             self.provider_name = provider_name
@@ -44,6 +45,7 @@ class ClaudeProvider:
         ).rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.max_tokens = max_tokens
+        self.temperature = temperature
 
     def _post_message(self, payload: dict[str, Any]) -> dict[str, Any]:
         def _call() -> dict[str, Any]:
@@ -172,6 +174,8 @@ class ClaudeProvider:
             "tools": self._convert_tools(tools),
             "max_tokens": self.max_tokens,
         }
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
         data = self._post_message(payload)
         content = data.get("content") or []
         if not isinstance(content, list):

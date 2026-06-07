@@ -43,6 +43,7 @@ def build_manifest(
     temperature: float,
     snapshot: str | None,
     snapshot_fingerprint: dict[str, Any] | None,
+    repo_root: Path,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest: dict[str, Any] = {
@@ -63,7 +64,7 @@ def build_manifest(
         "settings_hash": _settings_hash(config),
         "snapshot": snapshot,
         "snapshot_fingerprint": snapshot_fingerprint,
-        "git": git_metadata(config.root_dir),
+        "git": git_metadata(repo_root),
         # §5 audit trail: the exact framing used for injected memory, so the
         # "helper, not personality" claim is verifiable after the fact.
         "base_system_prompt": BASE_SYSTEM,
@@ -106,10 +107,16 @@ class Journal:
             "turn_index": result.turn_index,
             "ts": datetime.now(UTC).isoformat(),
             "user_text": result.user_text,
+            "messages_sent": result.messages_sent,
             "recalled_items": result.recalled_items,
             "injected_context": result.injected_context,
             "system_prompt": result.system_prompt,
+            "final_prompt": {
+                "system": result.system_prompt,
+                "messages": result.messages_sent,
+            },
             "response": result.response,
+            "persisted_memory": result.persisted_memory,
             "usage": result.usage,
             "duration_ms": result.duration_ms,
             "memory_state_after": result.memory_state_after,

@@ -85,6 +85,7 @@ def run_scenario(
         temperature=spec.temperature,
         snapshot=(str(input_snapshot) if input_snapshot else None),
         snapshot_fingerprint=snapshot_fp,
+        repo_root=base_config.root_dir,
         extra={"scenario_description": scenario.description, "seed": scenario.seed},
     )
     journal.write_manifest(manifest)
